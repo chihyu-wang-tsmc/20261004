@@ -129,12 +129,33 @@ AUC 和操作點完全相同，只有門檻的「數值」變了，但 ECE 差 4
 
 四列的 AUC、擋下率、誤擋率完全相同。門檻要用 [3] 實測出來的，不要用「0.8 聽起來像八成」推出來的。
 
+### 相依（不在這三天的改動範圍內，但 import 需要，一併收錄）
+
+| 檔案 | 說明 |
+| --- | --- |
+| `classifier_jevk5.py` | 連本機 jevk5 服務（`http://localhost:8090/v1/systemone`）的 LangChain Runnable，介面和 `TypeSafeClassifier` 相同。 |
+| `classifier_winnow.py` | Winnow 分類器的對應實作，`evaluate_winnow.py` 用。 |
+| `llm_models.py` | 共用的模型建立函式（qwen / deepseek / kimi / glm / gemini）。API key 一律讀環境變數，呼叫到才讀。 |
+| `routing_bench.py` | 四個 routing 腳本共用的骨架（`Bench`、`main`）。 |
+| `aime_routing.py` / `gpqa_routing.py` | 另外兩個 fast-powerful bench 的 routing 腳本，和已收錄的 ai2arc / gsm8k 成一套。 |
+| `deep7.py` | `deep10.py` 從這裡 import。 |
+
 ## 執行環境
 
-這些程式依賴同目錄下未收錄在本 repo 的檔案（它們不在這三天的改動範圍內）：
+```bash
+pip install langchain langchain-core langchain-openai langchain-google-genai \
+            langchain-typesafe deepagents httpx2 pyarrow langsmith
+```
 
-- `classifier_jevk5.py` —— 連本機 jevk5 服務（`http://localhost:8090/v1/systemone`）的 LangChain Runnable
-- `aime_routing.py` / `gpqa_routing.py` / `lcb_routing.py` 等其餘 routing 腳本
-- benchmark 原始資料（`~/safety_benchmarks` 等，用 `download_benchmarks.py` 取得）
+jevk5 服務要先跑起來（預設 `http://localhost:8090`）。
 
-套件需要 `langchain_core`、`langchain_typesafe`、`httpx2`、`pyarrow`。
+要用到外部 model 的部分（`routing_bench.py`、`gen_gold_probs.py`、`deep7.py`）才需要設對應的
+環境變數，只跑 jevk5 評估的話都不用：
+
+```
+DASHSCOPE_API_KEY   DEEPSEEK_API_KEY   MOONSHOT_API_KEY   ZAI_API_KEY   GEMINI_API_KEY
+WINNOW_BASE_URL     WINNOW_API_KEY
+```
+
+**benchmark 原始資料沒有收錄**（第三方資料集，體積大）。用 `download_benchmarks.py` 取得，
+路徑見 `deep10.py` 開頭的常數。`deep12.py report` 不需要原始資料，但 `run` 需要。
