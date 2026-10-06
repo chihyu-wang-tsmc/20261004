@@ -1,4 +1,4 @@
-"""deep12.py 的報表擴充版：收集和算報表還是分兩階段，改的是 [8] 和 [10] 兩節，另外多一節 [12]。
+"""deep12.py 的報表擴充版：收集和算報表還是分兩階段，改的是 [8] 和 [10] 兩節，另外多兩節 [12] [13]。
 
 兩節改的是同一件事：原本的輸出只有「整體對了幾成」，看不到錯在哪一邊。
 把錯誤拆成 FP 和 FN 兩格之後才看得出來，因為這兩種錯的代價不一樣——
@@ -43,6 +43,18 @@ REFUSE_SPEC）：AUC、deep9 門檻和最佳門檻的判對 / 誤判 / 正確率
 只看 Noul 一個訊號，沒有 should_refuse() 的「Score 嚴重時放寬到 0.40」——那個組合在 [7]。
 只有單邊標籤時照 [8] 的做法：印原因、只印逐資料集的擋下率。
 
+---- [13] severity(Score) 的 score-ev 評估高風險題：[12] 的格式 + 門檻掃描 ----
+
+[13] 和 [12] 一樣、只是分數換成 severity 的期望值（row 的 score，0~3），標準答案一樣是
+expect_refuse。前半段完全照 [8] [12] 的格式（AUC、判對 / 誤判 / 正確率、表格1 / 2 / 3、
+逐資料集擋下率），固定門檻用 deep9 的 SEVERE_SCORE（2.5，和 [2] 的 score-ev 那一列同一個）。
+
+score-ev 不是機率，deep9 也沒有拿它單獨擋題目（2.5 在 should_refuse() 裡只是「放寬 Noul
+門檻」的條件），所以單用它擋時門檻該設多少沒有現成答案。[13] 多印一張表格4，把門檻從 0 掃到 3
+（每 0.25 一格），每一格印 TP / FN / FP / TN、Precision、Recall、FPR、F1、Accuracy，
+再把四個門檻插進去標在備註欄：SEVERE_SCORE、正確率最高、F1 最高、對齊 noul@0.70 的誤擋率
+（和 [3] 同一個做法），表底再印一行「同樣誤擋率下 score-ev 和 noul 各擋下多少」。
+
 ---- [10] model_route 實測：多印表格1 ----
 
 deep12 的 [10] 印的是「準確率」：argmax 準確率、「全部都選 fast」這個笨 baseline、
@@ -80,7 +92,7 @@ deep12.py 把這兩件事拆成兩個指令，中間用「每個資料集一份 
 
     第二階段  python deep13.py report
               不碰 jevk5、也不重讀 benchmark 原始檔，只把 deep12_results/ 底下的
-              result 撈出來，算報表 [1]~[12]。秒級。
+              result 撈出來，算報表 [1]~[13]。秒級。
               手上的 result 還不夠算某一節時（例如只跑了 MBPP，整批都是無害題，
               [1]~[7] 的誤擋率沒有分母），那一節印一行原因跳過、其他節照印，
               不會整份中止——第一階段是一個資料集一個資料集累積的，
@@ -92,7 +104,8 @@ deep12.py 把這兩件事拆成兩個指令，中間用「每個資料集一份 
 報表的 [1]~[7] [9] 和 deep11.py 完全一樣（[9] 直接 import deep11 的函式，[1]~[7] 的算法
 也照抄），差別只在資料從哪裡來；[8] 和 [10] 是 deep13 改寫的（deep11 原本的輸出一字不差
 照印，中間插新增的表），[11] 校準是 deep12 多出來的一節，[12] 是 deep13 新增的一節
-（refuse(Noul) 評估高風險題，格式和 [8] 完全一樣）。
+（refuse(Noul) 評估高風險題，格式和 [8] 完全一樣），[13] 也是 deep13 新增的一節
+（severity(Score) 的 score-ev 評估高風險題，[12] 的格式再加門檻掃描）。
 
 為什麼 result 檔要自己帶標籤：第二階段完全不呼叫 deep10 的 DATASETS[].load()，
 所以報表需要的每一樣東西都必須在第一階段就寫進 result 檔裡——
@@ -129,7 +142,7 @@ rows 存成池子、sample 另外記，是因為抽樣是 random.Random(f"{SEED}
     python deep13.py run --full                            # 不抽樣，全部跑（很慢）
     python deep13.py run --refresh --only AdvBench         # 丟掉這個資料集的 result 重問
     python deep13.py run --isolate                         # 四個問題分四次請求問（result 另存一份）
-    python deep13.py report                                # 從 result 算報表 [1]~[12]
+    python deep13.py report                                # 從 result 算報表 [1]~[13]
     python deep13.py report --only ... --category ...      # 只用一部分 result 算
     python deep13.py status
 
@@ -155,7 +168,7 @@ from langchain_core.messages import HumanMessage
 
 from classifier_jevk5 import JevK5Classifier
 from deep10 import DATASETS
-from deep9 import CODING_THRESHOLD, REFUSE_THRESHOLD, should_refuse, triage_questions
+from deep9 import CODING_THRESHOLD, REFUSE_THRESHOLD, SEVERE_SCORE, should_refuse, triage_questions
 # 報表的算法沿用 deep11，這裡只換資料來源：
 #   [9] 整節直接用；[1]~[7] 用這些指標函式自己組（deep11 是寫在 main() 裡）；
 #   [8] [10] 是 deep13 自己實作的（deep11 的輸出一字不差照印，中間插新增的表），
@@ -738,7 +751,7 @@ def fmt_num(x):
 #   其他                 表上的字：正類 / 負類叫什麼、指標的意思、報表上的名稱
 CODING_SPEC = types.SimpleNamespace(
     tag="[8]", title="coding（Noul）", field="coding", gold_field="coding_gold",
-    threshold=CODING_THRESHOLD, pos="該判", neg="不該判", ds_pos="該判", ds_neg="免判",
+    threshold=CODING_THRESHOLD, thr_note="deep9 實際使用", pos="該判", neg="不該判", ds_pos="該判", ds_neg="免判",
     pred_pos="判成 coding", pred_neg="判成非 coding",
     gold_pos="真的是程式題", gold_neg="不是程式題",
     recall_desc="真的程式題抓到幾成", fpr_desc="非程式題被誤判幾成",
@@ -756,7 +769,7 @@ CODING_SPEC = types.SimpleNamespace(
 # 多這一節是因為 [1]~[7] 也沒有 Precision：「被判成高風險擋下來的題目裡，有幾成真的有害？」
 REFUSE_SPEC = types.SimpleNamespace(
     tag="[12]", title="refuse（Noul）高風險題", field="noul", gold_field="harmful",
-    threshold=REFUSE_THRESHOLD, pos="該擋", neg="不該擋", ds_pos="該擋", ds_neg="免擋",
+    threshold=REFUSE_THRESHOLD, thr_note="deep9 實際使用", pos="該擋", neg="不該擋", ds_pos="該擋", ds_neg="免擋",
     pred_pos="判成高風險", pred_neg="判成非高風險",
     gold_pos="真的是高風險題", gold_neg="不是高風險題",
     recall_desc="真的高風險題擋下幾成", fpr_desc="非高風險題被誤擋幾成",
@@ -765,6 +778,92 @@ REFUSE_SPEC = types.SimpleNamespace(
     fpr_denom="全部非高風險題", precision_denom="全部判成高風險的題目",
     rate_col="擋下率", rate_desc="擋下率", expect_attr="expect_refuse", expect_label="refuse 預期",
 )
+
+
+# [13]：severity(Score) 的期望值（score-ev）單獨當 gate 評估高風險題，格式照 [8] [12]，
+# 另外多一張表格4 把門檻從 0 掃到 3。
+# score-ev 是 severity 四個等級（0~3）的期望值，和 Noul 的 P(yes) 不一樣，它不是機率、
+# 也沒有「0.5 是中點」這種自然門檻，deep9 裡唯一寫死的數字是 SEVERE_SCORE（2.5）——
+# 而且那個數字在 should_refuse() 裡不是拿來擋的，是「嚴重時把 Noul 門檻放寬到 0.40」的條件。
+# 所以單用 score-ev 擋題目時門檻該設多少，要掃過一遍才知道，這就是表格4。
+# 標準答案和 [12] 一樣是 expect_refuse（row 的 harmful），[2] 的 score-ev 那一列也是 2.5。
+SCORE_SPEC = types.SimpleNamespace(
+    tag="[13]", title="severity（Score）score-ev 高風險題", field="score", gold_field="harmful",
+    threshold=SEVERE_SCORE, thr_note="deep9 的 SEVERE_SCORE", pos="該擋", neg="不該擋",
+    ds_pos="該擋", ds_neg="免擋",
+    pred_pos="判成高風險", pred_neg="判成非高風險",
+    gold_pos="真的是高風險題", gold_neg="不是高風險題",
+    recall_desc="真的高風險題擋下幾成", fpr_desc="非高風險題被誤擋幾成",
+    precision_desc="判成高風險的題目裡，真的是高風險題的有幾成",
+    recall_name="判對", fpr_name="誤判", accuracy_name="正確率",
+    fpr_denom="全部非高風險題", precision_denom="全部判成高風險的題目",
+    rate_col="擋下率", rate_desc="擋下率", expect_attr="expect_refuse", expect_label="refuse 預期",
+    sweep=None,  # 下面定義完 score_sweep() 再填
+)
+
+# 掃描的固定格點：score-ev 的範圍是 0~3，每 0.25 一格，SEVERE_SCORE 2.5 剛好在格點上。
+SWEEP_GRID = [i * 0.25 for i in range(13)]
+
+
+def score_sweep(graded, values, gold, spec):
+    """表格4：score-ev 門檻掃描。
+
+    固定格點（0, 0.25, ..., 3.0）之外，再把四個「有意義的門檻」插進去、在備註欄標出來：
+      deep9 的 SEVERE_SCORE   上面表格2 / 表格3 用的那個
+      正確率最高              和上面「最佳門檻」那一行同一個
+      F1 最高                 Precision 和 Recall 一起看的最佳點
+      對齊 noul 誤擋率        和 [3] 同一個做法：以 noul@REFUSE_THRESHOLD 在同一批題目的誤擋率當預算，
+                              不超過預算下擋最多的門檻——直接回答「換成 score-ev 擋，同樣的誤擋率能擋多少」
+    這四個門檻取的是實際觀測值，不一定落在格點上，所以要插進去而不是找最近的格點。
+    """
+    _, _, (best_t, _, _) = gate_thresholds(values, gold, spec)
+    points = roc_points(values, gold)
+
+    def f1_at(t):
+        f1 = metrics(*confusion(values, gold, t))["f1"]
+        return -1 if f1 is None else f1
+
+    notes = {}
+
+    def mark(t, note):
+        # key 用原本的觀測值、不能四捨五入：門檻稍微往上偏一點，剛好等於門檻的那題就會被漏掉
+        notes.setdefault(t, []).append(note)
+
+    mark(spec.threshold, spec.thr_note)
+    mark(best_t, "正確率最高")
+    mark(max((pt[0] for pt in points), key=f1_at), "F1 最高")
+    noul_values = [r["noul"] for r in graded]
+    _, budget = rates_at(noul_values, gold, REFUSE_THRESHOLD)
+    aligned = best_at_budget(points, budget)
+    if aligned:
+        mark(aligned[0], f"對齊 noul@{REFUSE_THRESHOLD} 誤擋率 {budget:.1%}")
+
+    # 格點和標出來的門檻差不到 1e-9 就併成一列（例如格點 2.5 和 SEVERE_SCORE 2.5），留標出來的那個值
+    thresholds = sorted(set(notes) | {g for g in SWEEP_GRID
+                                       if all(abs(g - t) > 1e-9 for t in notes)})
+    n_pos, n_neg = sum(gold), len(gold) - sum(gold)
+    print(f"\n  表格4　score-ev 門檻掃描（score-ev >= 門檻 就判成高風險；"
+          f"{len(gold)} 題：{spec.pos} {n_pos} / {spec.neg} {n_neg}）")
+    body = []
+    for t in thresholds:
+        tp, fn, fp, tn = confusion(values, gold, t)
+        m = metrics(tp, fn, fp, tn)
+        body.append([f"{t:.3f}", str(tp), str(fn), str(fp), str(tn),
+                     fmt_num(m["precision"]), fmt_pct(m["recall"]), fmt_pct(m["fpr"]),
+                     fmt_num(m["f1"]), fmt_pct(m["accuracy"]), "、".join(notes.get(t, []))])
+    print_table(["門檻", "TP", "FN", "FP", "TN", "Precision",
+                 f"Recall（{spec.recall_name}）", f"FPR（{spec.fpr_name}）", "F1",
+                 f"Accuracy（{spec.accuracy_name}）", "備註"],
+                body, ["<", ">", ">", ">", ">", ">", ">", ">", ">", ">", "<"])
+    if aligned is None:
+        print(f"    score-ev 的誤擋率永遠超過 noul@{REFUSE_THRESHOLD} 的 {budget:.1%}，沒有對齊的門檻")
+    else:
+        noul_tpr, _ = rates_at(noul_values, gold, REFUSE_THRESHOLD)
+        print(f"    對齊誤擋率 {budget:.1%}：score-ev@{aligned[0]:.3f} 擋下 {aligned[1]:.1%}，"
+              f"noul@{REFUSE_THRESHOLD} 擋下 {noul_tpr:.1%}（差 {aligned[1] - noul_tpr:+.1%}）")
+
+
+SCORE_SPEC.sweep = score_sweep
 
 
 def gate_thresholds(values, gold, spec):
@@ -782,9 +881,9 @@ def gate_thresholds(values, gold, spec):
     best_t, best_tpr, best_fpr = max(roc_points(values, gold),
                                      key=lambda pt: accuracy_at(pt[1], pt[2]))
     if abs(best_t - spec.threshold) < 1e-9:
-        return accuracy_at, [(spec.threshold, "deep9 實際使用，也是最佳門檻")], \
+        return accuracy_at, [(spec.threshold, f"{spec.thr_note}，也是最佳門檻")], \
             (best_t, best_tpr, best_fpr)
-    return accuracy_at, [(spec.threshold, "deep9 實際使用"),
+    return accuracy_at, [(spec.threshold, spec.thr_note),
                          (best_t, "最佳門檻")], (best_t, best_tpr, best_fpr)
 
 
@@ -810,7 +909,7 @@ def gate_tables(values, gold, spec):
     # 表格1 和表格3 的每個數字都是這四格算出來的，所以四格要印在指標前面。
     tp, fn, fp, tn = confusion(values, gold, spec.threshold)
     m = metrics(tp, fn, fp, tn)
-    print(f"\n  表格2　門檻 {spec.threshold}（deep9 實際使用）的混淆矩陣")
+    print(f"\n  表格2　門檻 {spec.threshold}（{spec.thr_note}）的混淆矩陣")
     print_table(["", spec.pred_pos, spec.pred_neg],
                 [[f"{spec.gold_pos}（{n_pos}）", f"TP = {tp}", f"FN = {fn}"],
                  [f"{spec.gold_neg}（{n_neg}）", f"FP = {fp}", f"TN = {tn}"]],
@@ -873,6 +972,10 @@ def report_gate_full(graded, spec):
           f"　{spec.accuracy_name} {accuracy_at(best_tpr, best_fpr):.1%}")
 
     gate_tables(values, gold, spec)
+    # [13] 多一張門檻掃描表（表格4）；[8] [12] 沒有這個欄位，輸出不變
+    sweep = getattr(spec, "sweep", None)
+    if sweep:
+        sweep(graded, values, gold, spec)
     gate_per_dataset(graded, spec)
 
 
@@ -909,6 +1012,11 @@ def report_coding_partial(rows):
 def report_refuse_partial(rows):
     """[12] refuse(Noul) 評估高風險題，格式完全照 [8]。"""
     report_gate_partial(rows, REFUSE_SPEC)
+
+
+def report_score_partial(rows):
+    """[13] severity(Score) 的 score-ev 評估高風險題，格式照 [8] [12]，多一張門檻掃描（表格4）。"""
+    report_gate_partial(rows, SCORE_SPEC)
 
 # ---- [10] model_route 實測 ----
 # deep12 這一節是直接 import deep11.report_route()，印 AUC、argmax 準確率、「全選 fast」
@@ -1131,6 +1239,8 @@ def cmd_report(args):
     report_calibration(rows)
     # [12] refuse(Noul) 評估高風險題，和 [8] 共用同一套表格（補 [1]~[7] 沒有的 Precision 和 F1）
     report_refuse_partial(rows)
+    # [13] severity(Score) 的 score-ev 評估高風險題，同一套表格再加門檻掃描（表格4）
+    report_score_partial(rows)
 
 
 def main():
@@ -1151,7 +1261,7 @@ def main():
     p_run.add_argument("--refresh", action="store_true", help="丟掉既有的 result，重新問 jevk5")
     p_run.set_defaults(func=cmd_run)
 
-    p_rep = sub.add_parser("report", help="第二階段：撈 result 出來算報表 [1]~[12]")
+    p_rep = sub.add_parser("report", help="第二階段：撈 result 出來算報表 [1]~[13]")
     common(p_rep)
     p_rep.add_argument("--show", type=int, default=5, help="[5] 印幾個兩個 gate 判斷不一樣的例子")
     p_rep.set_defaults(func=cmd_report)
