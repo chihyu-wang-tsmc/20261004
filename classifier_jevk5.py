@@ -21,6 +21,37 @@ JEVK5_MODEL = "alibiserikbay/JevK5"
 logger = logging.getLogger(__name__)
 
 
+# ---- confidence ----
+# jevk5 服務回傳的 confidence 是 p_max（jevk5/prompt.py:166 的 max(probs.values())），
+# 不是 https://docs.typesafe.ai/confidence 的公式。_parse 用下面三個函式照文件重算。
+
+
+def choice_confidence(probabilities: list[float]) -> float:
+    """Choice：(n * p_max - 1) / (n - 1)，平均分配是 0、全押一個是 1。"""
+    n = len(probabilities)
+    return min(1.0, max(0.0, (n * max(probabilities) - 1) / (n - 1)))
+
+
+def score_confidence(probabilities: list[float]) -> float:
+    """Score：1 - 離峰值的平均距離 / 平均分配時的平均距離，最低到 0。
+
+    等級有順序，機率落在隔壁等級只扣一點，落在遠端扣很多。probabilities 要照等級 0..n-1 排好。
+    """
+    n = len(probabilities)
+    m = probabilities.index(max(probabilities))
+    spread = sum(p * abs(i - m) for i, p in enumerate(probabilities))
+    even_spread = sum(abs(i - (n - 1) / 2) for i in range(n)) / n
+    return max(0.0, 1 - spread / even_spread)
+
+
+def noul_confidence(p: float) -> float:
+    """Noul：|2p - 1|，也就是 n=2 的 Choice。
+
+    TypeSafe 的 Noul 答案沒有 confidence 欄位（NoulAnswer 也沒有），要用時對 answer.noul 呼叫這個。
+    """
+    return choice_confidence([p, 1 - p])
+
+
 class JevK5Classifier(RunnableSerializable[ClassifierRequest, ClassifierResponse]):
     """用本機 jevk5 服務取代 TypeSafeClassifier，用法相同。
 
@@ -105,13 +136,26 @@ class JevK5Classifier(RunnableSerializable[ClassifierRequest, ClassifierResponse
     def _parse(
         self, response: httpx2.Response, payload: dict[str, JsonValue]
     ) -> ClassifierResponse:
-        # jevk5 的 score 答案沒有 legend，照 TypeSafe 的格式補上
+        # jevk5 的 score 答案沒有 legend，照 TypeSafe 的格式補上；
+        # confidence 改成 TypeSafe 文件的公式（見上面三個 *_confidence 函式）
         if response.is_success:
             data = response.json()
             for name, ans in data.get("answers", {}).items():
-                if ans.get("type") == "score":
+                kind = ans.get("type")
+                if kind == "noul":
+                    # TypeSafe 的 Noul 不回 confidence，拿掉 jevk5 多送的 p_max
+                    ans.pop("confidence", None)
+                elif kind == "choice":
+                    ans["confidence"] = choice_confidence(
+                        list(ans["probabilities"].values())
+                    )
+                elif kind == "score":
                     criteria = payload["questions"][name]["criteria"]
                     ans.setdefault("legend", dict(enumerate(criteria)))
+                    probs = ans["probabilities"]
+                    ans["confidence"] = score_confidence(
+                        [probs[k] for k in sorted(probs, key=int)]
+                    )
             response = httpx2.Response(
                 response.status_code, json=data, request=response.request
             )
