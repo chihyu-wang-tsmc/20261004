@@ -123,9 +123,8 @@ result 檔的結構（deep12_results/<資料集>.json）：
     score / probs / score_conf  severity 的期望值、完整分佈、confidence
     coding / coding_conf      coding 的 P(yes) 和它的 confidence
     route / route_p / route_conf  model_route 的選擇、P(powerful)、confidence
-    <名稱>_conf_api           服務自己回傳的 confidence（Noul 沒有這個欄位，存 None）
-兩種 confidence 都存是因為實測發現本機 jevk5 回傳的 confidence 等於 p_max，
-不是文件上那個公式，分佈平坦時兩者差很多——理由和數字見 unpack() 上面的註解。
+confidence 一律呼叫 classifier_jevk5 的 choice_confidence / score_confidence / noul_confidence，
+和 JevK5Classifier 回傳的 .confidence 是同一套公式。
 
 rows 存成池子、sample 另外記，是因為抽樣是 random.Random(f"{SEED}-{資料集名}").sample(prompts, n)，
 換一個 n 抽到的不是原來那一批的子集。存成池子的話，-n 80 跑過再跑 -n 150 只要補問差額，
@@ -166,7 +165,7 @@ from datetime import datetime
 
 from langchain_core.messages import HumanMessage
 
-from classifier_jevk5 import JevK5Classifier
+from classifier_jevk5 import JevK5Classifier, choice_confidence, noul_confidence, score_confidence
 from deep10 import DATASETS
 from deep9 import CODING_THRESHOLD, REFUSE_THRESHOLD, SEVERE_SCORE, should_refuse, triage_questions
 # 報表的算法沿用 deep11，這裡只換資料來源：
@@ -193,6 +192,8 @@ RESULT_DIR = os.path.join(HERE, "deep12_results")
 # result 檔的格式版本。格式改了就加一，舊檔會被當成不能用（印出來叫使用者重跑那個資料集），
 # 而不是靜悄悄少欄位算出錯的數字。
 #   1 → 2  四個答案各加兩個 confidence 欄位（見 unpack()）
+#          後來拿掉 <名稱>_conf_api（服務回傳的 p_max）：classifier_jevk5 已改成文件公式，
+#          它和 <名稱>_conf 變成同一個值。<名稱>_conf 的算法沒變，所以舊檔照用、不用加版本
 SCHEMA = 2
 
 CATEGORIES = ("safety", "jailbreak", "injection", "cyber", "coding", "skill", "fast-powerful")
@@ -202,50 +203,22 @@ CHUNK = 40
 
 
 # ---- confidence ----
-# https://docs.typesafe.ai/confidence 的兩個公式，照文件的實作一字不差地抄過來。
+# choice_confidence / score_confidence / noul_confidence 從 classifier_jevk5 import，
+# 全 repo 只有那一份實作（https://docs.typesafe.ai/confidence 的公式）：
+#   Choice  (n·p_max - 1) / (n - 1)
+#   Score   max(0, 1 - Σ pᵢ·|i - m| / MAD_uniform)
+#   Noul    |2p - 1|
 #
-# 為什麼要自己算，不直接用服務回傳的 ans.confidence：
-#   1. NoulAnswer 沒有 confidence 欄位（只有 ChoiceAnswer 和 ScoreAnswer 有），
-#      所以 refuse 和 coding 的 confidence 本來就只能自己算。
-#   2. 本機 jevk5 服務回傳的 confidence 實測等於 p_max（最大機率值），不是文件上的公式。
-#      四題實測全部吻合到小數點後四位，差距在分佈平坦時很大：
-#        毒品成癮小說那題 severity，服務 0.8097、文件公式 0.5287（p_max 就是 0.8097）
-#      兩個都存：conf 是文件公式的值，conf_api 是服務回傳的值，報表要用哪個自己選。
-#
-# Noul 沒有對應的公式，用 Choice 的公式套 n=2（兩個選項 yes / no）：
-#   (max(p, 1-p) - 1/2) / (1 - 1/2) = |2p - 1|
-# 意思是「離 50/50 多遠」，0 代表完全沒把握、1 代表完全確定。
-
-
-def choice_confidence(probabilities):
-    """Choice：最大機率比「平均分配」高出多少，normalize 到 0~1。"""
-    n = len(probabilities)
-    return (max(probabilities) - 1 / n) / (1 - 1 / n)
-
-
-def score_confidence(probabilities):
-    """Score：機率質量離峰值有多遠（越集中越高），用「平均分配」的平均距離當分母。
-
-    和 Choice 的差別在於 Score 的等級有順序：機率落在隔壁等級只扣一點，
-    落在最遠的那一端扣很多。probabilities 要照等級 0..n-1 排好。
-    """
-    n = len(probabilities)
-    m = probabilities.index(max(probabilities))
-    spread = sum(p * abs(i - m) for i, p in enumerate(probabilities))
-    even_spread = sum(abs(i - (n - 1) / 2) for i in range(n)) / n
-    return max(0.0, 1 - spread / even_spread)
-
-
-def noul_confidence(p):
-    """Noul：當成 n=2 的 Choice，等於 |2p - 1|。"""
-    return choice_confidence([p, 1 - p])
+# 為什麼要另外算、不直接用服務的 confidence：本機 jevk5 服務回傳的 confidence 實測等於 p_max，
+# 不是文件公式（毒品成癮小說那題 severity：p_max 0.8097、文件公式 0.5287）。
+# JevK5Classifier 現在已經照文件公式重算，這裡直接呼叫同一組函式，數值和 .confidence 一致。
 
 
 def unpack(response):
     """把 jevk5 的回應攤成 row 要存的欄位。
 
-    和 deep11.unpack() 的差別只有 confidence：四個答案各多兩欄，
-    <名稱>_conf 是文件公式算的，<名稱>_conf_api 是服務自己回傳的（Noul 沒有，存 None）。
+    和 deep11.unpack() 的差別只有 confidence：四個答案各多一欄 <名稱>_conf，
+    用 classifier_jevk5 的文件公式算。
     """
     refuse = response.nouls["refuse"]
     coding = response.nouls["coding"]
@@ -257,19 +230,15 @@ def unpack(response):
     return {
         "noul": refuse.noul,
         "noul_conf": noul_confidence(refuse.noul),
-        "noul_conf_api": None,  # NoulAnswer 沒有 confidence 欄位
         "score": severity.score,
         "probs": dict(severity.probabilities),
         "score_conf": score_confidence(sev_probs),
-        "score_conf_api": severity.confidence,
         "coding": coding.noul,
         "coding_conf": noul_confidence(coding.noul),
-        "coding_conf_api": None,
         "route": route.choice,
         # P(powerful)：model_route 是 Choice，但有機率分佈，所以也能像 Noul 一樣掃門檻
         "route_p": route.probabilities["powerful"],
         "route_conf": choice_confidence(route_probs),
-        "route_conf_api": route.confidence,
     }
 
 
