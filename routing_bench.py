@@ -207,6 +207,8 @@ def cmd_regrade(bench, args):
 def cmd_route(bench, args):
     from langchain_typesafe import Choice
 
+    from classifier_jevk5 import choice_confidence
+
     questions = bench.load_questions(args)[: args.limit]
     os.makedirs(bench.dir, exist_ok=True)
     routes_path = bench.routes_path(args.router)
@@ -231,7 +233,10 @@ def cmd_route(bench, args):
                 answer = response.choices["model_route"]
                 r = {
                     "id": q["id"], "ok": True, "route": answer.choice,
-                    "probabilities": answer.probabilities, "confidence": answer.confidence,
+                    # confidence 不用服務回傳的（Winnow 的算法不一定跟文件一樣），
+                    # 一律用 classifier_jevk5 的文件公式從 probabilities 算，兩個 router 才比得起來
+                    "probabilities": answer.probabilities,
+                    "confidence": choice_confidence(list(answer.probabilities.values())),
                     "input_tokens": response.usage.input_tokens,
                 }
                 counts[answer.choice] += 1
