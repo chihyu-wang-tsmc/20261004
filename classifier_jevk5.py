@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 import httpx2
 from langchain_core.runnables import RunnableConfig, RunnableSerializable
@@ -10,7 +10,13 @@ from langchain_typesafe.client import (
     TypeSafeAPITimeoutError,
     parse_response,
 )
-from langchain_typesafe.types import ClassifierRequest, ClassifierResponse
+from langchain_typesafe.types import (
+    ChoiceAnswer,
+    ClassifierRequest,
+    ClassifierResponse,
+    NoulAnswer,
+    ScoreAnswer,
+)
 from langsmith.run_helpers import get_current_run_tree
 from pydantic import ConfigDict, Field, JsonValue, model_validator
 from typing_extensions import Self
@@ -24,6 +30,7 @@ logger = logging.getLogger(__name__)
 # ---- confidence ----
 # jevk5 服務回傳的 confidence 是 p_max（jevk5/prompt.py:166 的 max(probs.values())），
 # 不是 https://docs.typesafe.ai/confidence 的公式。_parse 用下面三個函式照文件重算。
+# Noul 在 TypeSafe 本來沒有 confidence，這裡也照 |2p - 1| 補上（NoulAnswerWithConfidence）。
 
 
 def choice_confidence(probabilities: list[float]) -> float:
@@ -45,11 +52,34 @@ def score_confidence(probabilities: list[float]) -> float:
 
 
 def noul_confidence(p: float) -> float:
-    """Noul：|2p - 1|，也就是 n=2 的 Choice。
-
-    TypeSafe 的 Noul 答案沒有 confidence 欄位（NoulAnswer 也沒有），要用時對 answer.noul 呼叫這個。
-    """
+    """Noul：|2p - 1|，也就是 n=2 的 Choice。"""
     return choice_confidence([p, 1 - p])
+
+
+class NoulAnswerWithConfidence(NoulAnswer):
+    """NoulAnswer 多一個 confidence。
+
+    TypeSafe 的 NoulAnswer 沒有 confidence 欄位，直接塞進 JSON 會被 pydantic 丟掉，
+    所以用子類別；isinstance(ans, NoulAnswer) 照樣成立，response.nouls 拿得到。
+    """
+
+    confidence: float = Field(ge=0.0, le=1.0)
+    """|2p - 1|，見 noul_confidence。"""
+
+
+class JevK5Response(ClassifierResponse):
+    """ClassifierResponse，只是 Noul 答案換成 NoulAnswerWithConfidence。
+
+    answers 的型別要跟著換，不然 model_dump / LangSmith trace 會照 NoulAnswer 輸出、漏掉 confidence。
+    """
+
+    answers: dict[
+        str,
+        Annotated[
+            NoulAnswerWithConfidence | ChoiceAnswer | ScoreAnswer,
+            Field(discriminator="type"),
+        ],
+    ]
 
 
 class JevK5Classifier(RunnableSerializable[ClassifierRequest, ClassifierResponse]):
@@ -137,14 +167,13 @@ class JevK5Classifier(RunnableSerializable[ClassifierRequest, ClassifierResponse
         self, response: httpx2.Response, payload: dict[str, JsonValue]
     ) -> ClassifierResponse:
         # jevk5 的 score 答案沒有 legend，照 TypeSafe 的格式補上；
-        # confidence 改成 TypeSafe 文件的公式（見上面三個 *_confidence 函式）
+        # confidence 改成 TypeSafe 文件的公式（見上面三個 *_confidence 函式），Noul 也補上
         if response.is_success:
             data = response.json()
             for name, ans in data.get("answers", {}).items():
                 kind = ans.get("type")
                 if kind == "noul":
-                    # TypeSafe 的 Noul 不回 confidence，拿掉 jevk5 多送的 p_max
-                    ans.pop("confidence", None)
+                    ans["confidence"] = noul_confidence(ans["noul"])
                 elif kind == "choice":
                     ans["confidence"] = choice_confidence(
                         list(ans["probabilities"].values())
@@ -159,7 +188,13 @@ class JevK5Classifier(RunnableSerializable[ClassifierRequest, ClassifierResponse
             response = httpx2.Response(
                 response.status_code, json=data, request=response.request
             )
-        return self._record_usage(parse_response(response))
+        # 錯誤處理和 request_id 照 TypeSafe 的 parse_response；失敗的回應在這裡就 raise 了
+        parsed = parse_response(response)
+        # 再用 JevK5Response 驗一次，Noul 的 confidence 才留得住（見 NoulAnswerWithConfidence）
+        parsed = JevK5Response.model_validate(
+            {**parsed.model_dump(), "answers": data["answers"]}
+        )
+        return self._record_usage(parsed)
 
     def _traced_config(self, config: RunnableConfig | None) -> RunnableConfig:
         """讓 LangSmith trace 顯示 provider 和模型名稱。"""
