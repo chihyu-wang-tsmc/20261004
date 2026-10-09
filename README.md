@@ -45,6 +45,7 @@ jevk5 對每個使用者請求同時回答四個問題，這批程式在評估�
 | --- | --- |
 | `llm_guardrails.py` | TypeSafe [Guardrails for LLMs](https://docs.typesafe.ai/cookbooks/llm_guardrails) cookbook 改用 `JevK5Classifier`：輸入／輸出各一組危害 Noul 加 severity Score，`route()` 依 strict / permissive 門檻決定 pass / review / block / support。 |
 | `llm_guardrails_prompts.txt` / `llm_guardrails_replies.txt` | 上面用的 10 則使用者訊息和 5 則模型回覆。 |
+| `deep9_llm_guardrails.py` | deep9 的 guardrails 版：`model_route` / `coding` 照 deep9，拒絕改用 `llm_guardrails.py` 的危害 battery 和 `route()`（pass / review / block / support），輸入、輸出各檢查一次。 |
 
 ## deep12.py 做了什麼
 
