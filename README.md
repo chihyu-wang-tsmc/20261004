@@ -39,6 +39,13 @@ jevk5 對每個使用者請求同時回答四個問題，這批程式在評估�
 | `ai2arc_routing.py` / `gsm8k_routing.py` | 讓 fast 和 powerful 兩個 model 實際作答再評分，產出 model_route 的**實測**標準答案（「能答對的最便宜 model」：fast 對→fast、fast 錯 powerful 對→powerful、兩個都錯→不列入）。 |
 | `evaluate_jevbench.py` / `evaluate_jevk5.py` / `evaluate_winnow.py` | 各自的評分腳本。 |
 
+### cookbook 移植
+
+| 檔案 | 說明 |
+| --- | --- |
+| `llm_guardrails.py` | TypeSafe [Guardrails for LLMs](https://docs.typesafe.ai/cookbooks/llm_guardrails) cookbook 改用 `JevK5Classifier`：輸入／輸出各一組危害 Noul 加 severity Score，`route()` 依 strict / permissive 門檻決定 pass / review / block / support。 |
+| `llm_guardrails_prompts.txt` / `llm_guardrails_replies.txt` | 上面用的 10 則使用者訊息和 5 則模型回覆。 |
+
 ## deep12.py 做了什麼
 
 ### 1. 拆成兩階段
