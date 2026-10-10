@@ -1,40 +1,83 @@
-"""deep12.py `run` 這條路徑會呼叫到、但定義在其他 deep*.py 的函式，全部集中在這一個檔案。
+"""`python deep14.py run` —— deep12.py 的 run 階段，整併成單一檔案、不 import 任何 deep*。
 
-這個檔案不含 deep12.py 自己的 run 流程（cmd_run / run_dataset / sample_prompts / ask /
-unpack / build_result / save_result / result_path / load_result / pick_datasets 都還在 deep12.py）；
-這裡只把那條路徑「跨檔用到的東西」搬過來，方便一次看完外部相依。
+deep12.py 的 run 需要三個檔案配合（deep9 的 triage_questions、deep10 的 DATASETS 與所有
+loader、deep11 的 prompt_key / SAMPLE_SEED / QUESTION_NAMES）。本檔把那些外部函式、
+加上 deep12 自己的 run 流程，全部收在一起，所以單獨一個 deep14.py 就能跑完第一階段。
 
-`python deep12.py run` 的呼叫順序，以及每個外部名稱來自哪裡（★ = 收錄在本檔）：
+    python deep14.py run                                   # 50 個資料集全跑，各抽 80 題
+    python deep14.py run --only AdvBench HarmBench         # 只跑這兩個
+    python deep14.py run --category coding safety          # 按七個類別挑
+    python deep14.py run -n 150                            # 加大樣本（已問過的會沿用）
+    python deep14.py run --full                            # 不抽樣，全部跑（很慢）
+    python deep14.py run --refresh --only AdvBench         # 丟掉這個資料集的 result 重問
+    python deep14.py run --isolate                         # 四個問題分四次請求問（result 另存一份）
+    python deep14.py run --cn                              # 改跑中文版資料集（見下）
+    python deep14.py status                                # 看哪些資料集已經有 result
 
-    cmd_run                         [deep12]
-      pick_datasets                 [deep12]
-        DATASETS                    [deep10] ★  ← 50 個資料集的定義（含 DS 類別、所有 loader）
-      run_dataset                   [deep12]
-        sample_prompts              [deep12]
-          d.load()                  [deep10] ★  ← DATASETS 裡每個 DS 的 load（csv_col / parquet_col /
-                                                   jsonl_col / json_list_col / aegis / openai_moderation /
-                                                   wildjailbreak / harmbench_attack / mitre_frr /
-                                                   bipia_attacks / secbench / labelled_parquet /
-                                                   routing_prompts）
-          SAMPLE_SEED               [deep11] ★  ← 抽樣 seed（random.Random(f"{SEED}-{name}")）
-        d.route_gold()              [deep10] ★  ← 只有 fast-powerful 類有（routing_gold → _routing_rows）
-        prompt_key                  [deep11] ★  ← 每題的 sha1 key
-        ask                         [deep12]
-          triage_questions          [deep9]  ★  ← 一次問 jevk5 的四個問題定義
-          QUESTION_NAMES            [deep11] ★  ← --isolate 時逐一分開問用的問題名稱順序
-        build_result                [deep12]
-          prompt_key / SAMPLE_SEED  [deep11] ★
-        save_result                 [deep12]
+---- --cn：跑 translate_cn.py 產出的中文版資料集 ----
 
-注意：deep12.py 還從 deep9 / deep11 import 了一批「只有 report 路徑才用」的名稱
-（CODING_THRESHOLD、REFUSE_THRESHOLD、should_refuse、GATES、auc、rates_at、roc_points、
-macro、best_at_budget、tail_mass、report_coding、report_route、report_route_expect），
-run 路徑完全沒碰，所以不收在這裡。
+translate_cn.py 把 50 個資料集翻成繁體中文，規則是「只有最上層的根目錄加 _cn，底下的相對路徑、
+檔名、副檔名、欄位名稱和順序全部照原樣」，所以 --cn 只做兩件事：
 
-confidence 三件套（noul_confidence / score_confidence / choice_confidence）和 JevK5Classifier
-來自 classifier_jevk5，不是 deep*.py，依題意不收錄，deep12 仍直接 import。
+    1. SAFE / JB / PI / CODE / CYBER / SKILL 六個根目錄常數加上 _cn（use_cn_datasets()）。
+       loader 和 DATASETS 一行都不用改——lambda 裡的 f-string 是呼叫時才展開的。
+    2. result 還是存在同一個 deep12_results/，只是檔名加 _cn：
+           deep12_results/AdvBench.json      英文版
+           deep12_results/AdvBench_cn.json   中文版
+       兩份並存、互不覆蓋，不另開目錄。檔案裡的 meta.lang 記著是哪一版。
 
-每個函式下方的 # 來源 註記標出它在哪個檔、原本第幾區塊，內容與原檔一字不差。
+後綴只加在檔名上，d.name 不變，這點是刻意的：抽樣 seed 是 f"{SAMPLE_SEED}-{d.name}"，
+名字一變就會抽到不同的題目。維持原名才能保證中文版抽到的是「同一批題目的中文版」，
+數字一題對一題比得起來。
+
+GPQA / AI2ARC / AIME / GSM8K 這四個 fast-powerful bench 也含在 --cn 裡，但它們不吃上面那六個
+根目錄常數，要另外處理（_use_cn_routing_benches()）：
+
+    module.DATA_DIR   <name> → <name>_cn    題目檔；四個 *_routing.py 已改成呼叫時才組路徑
+    bench.name        <name> → <name>_cn    Bench.dir 與 answers_dir 都由 name 算出來
+
+剩下一件事要你自己做：它們的 model_route 標準答案（route_gold）是「兩個 model 實際作答再評分」
+得到的，中文題是不同的難度，必須重跑才有意義：
+
+    python gpqa_routing.py answer --model deepseek-flash      # 四個 bench 各跑兩個 model
+    python gpqa_routing.py answer --model gemini-3.7-flash
+
+還沒跑之前，_routing_rows() 會丟出寫明該跑什麼的 RuntimeError，cmd_run() 接住印 [skip]，
+其餘 46 個資料集照跑，不會整批停住。
+
+報表：deep12.py / deep13.py 的 report 是用 pick_datasets() 的資料集名去找 <名字>.json，
+找不到帶 _cn 的那些，所以現階段它們只會算到英文版。要算中文版報表，得讓 report 也認得
+_cn 的檔名（例如把 result_path 的規則一起帶過去）。
+
+報表（第二階段）不在本檔：result 一樣寫進 deep12_results/、格式一樣是 SCHEMA 2，
+所以跑完之後直接用原本的指令算報表就好：
+
+    python deep12.py report          # 或 deep13.py report（多 FP/FN 拆解的版本）
+
+本檔的組成，每一段都和來源一字不差：
+    原 deep11   SAMPLE_SEED、QUESTION_NAMES、prompt_key
+    原 deep9    SEVERITY_LEVELS、triage_questions
+    原 deep10   路徑常數、各格式 loader、routing 標準答案、DS、DATASETS（50 個資料集）
+    原 deep12   HERE/RESULT_DIR/SCHEMA/CATEGORIES/CHUNK、unpack、ask、result_path、
+                load_result、save_result、pick_datasets、sample_prompts、run_dataset、
+                build_result、cmd_run、cmd_status（即 deep12.py 的第 104-360 行）
+
+`python deep14.py run` 的呼叫順序：
+
+    cmd_run
+      pick_datasets                 ← DATASETS（原 deep10）
+      run_dataset
+        sample_prompts              ← d.load()（原 deep10 的各 loader）、SAMPLE_SEED（原 deep11）
+        load_result / result_path
+        d.route_gold()              ← routing_gold → _routing_rows（原 deep10）
+        prompt_key                  ← 原 deep11
+        ask                         ← triage_questions（原 deep9）、QUESTION_NAMES（原 deep11）
+          classifier.batch(...)     ← JevK5Classifier（classifier_jevk5，非 deep*，照常 import）
+          unpack                    ← noul/score/choice_confidence（同上）
+        build_result / save_result
+
+非 deep* 的相依仍然是 import：classifier_jevk5、langchain_typesafe、langchain_core、
+routing_bench、pyarrow。
 """
 
 import argparse
@@ -46,12 +89,19 @@ import importlib
 import json
 import lzma
 import os
+import random
+import re
+import time
+import types
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable
 
 import pyarrow.parquet as pq
+from langchain_core.messages import HumanMessage
 from langchain_typesafe import Choice, Noul, NoulCriteria, Score
 
+from classifier_jevk5 import JevK5Classifier, choice_confidence, noul_confidence, score_confidence
 # _routing_rows 需要（非 deep*.py，保留為 import）
 from routing_bench import Bench, read_jsonl
 
@@ -143,6 +193,53 @@ PI = f"{H}/prompt_injection_benchmarks"
 CODE = f"{H}/code_benchmarks"
 CYBER = f"{H}/cybersecurity_benchmarks"
 SKILL = f"{H}/jevk5/skill_queries/all.jsonl"
+
+# ---- 中文版資料集（--cn）----
+# translate_cn.py 把 50 個資料集翻成繁體中文，輸出規則是「只有最上層的根目錄加 _cn，
+# 底下的相對路徑、檔名、副檔名、欄位全部照原樣」，所以這裡只要把根目錄常數換掉，
+# 上面那些 loader 和下面的 DATASETS 一行都不用改（lambda 裡的 f-string 是呼叫時才展開的）。
+CN_SUFFIX = "_cn"
+CN = False
+"""現在跑的是不是中文版；由 --cn 設定，result_path() 和 build_result() 會看它。"""
+
+
+def use_cn_datasets():
+    """把資料集根目錄切到 _cn 版。
+
+    result 仍然存在同一個 deep12_results/，只是檔名加 _cn（見 result_path()），
+    所以中英文兩份結果並存、互不覆蓋，也不用多一個目錄。
+    """
+    global SAFE, JB, PI, CODE, CYBER, SKILL, CN
+    SAFE += CN_SUFFIX
+    JB += CN_SUFFIX
+    PI += CN_SUFFIX
+    CODE += CN_SUFFIX
+    CYBER += CN_SUFFIX
+    SKILL = f"{H}/jevk5/skill_queries{CN_SUFFIX}/all.jsonl"
+    CN = True
+    _use_cn_routing_benches()
+
+
+def _use_cn_routing_benches():
+    """把四個 fast-powerful bench（GPQA / AI2ARC / AIME / GSM8K）也切到中文版。
+
+    它們不吃上面那六個根目錄常數：題目在各自的 *_routing.py 裡、答案在 Bench.dir/answers/。
+    所以這裡改兩個地方，兩者都是呼叫時才讀，所以 import 之後改還來得及：
+        module.DATA_DIR  <name> → <name>_cn   題目檔（load_questions() 每次呼叫才組路徑）
+        bench.name       <name> → <name>_cn   Bench.dir 與 answers_dir 都是由 name 算出來的
+
+    答案（route_gold）要另外用中文題重跑才有：
+        python gpqa_routing.py answer --model deepseek-flash
+        python gpqa_routing.py answer --model gemini-3.7-flash
+    還沒跑的話 _routing_rows() 會丟 RuntimeError 說明要跑什麼，cmd_run() 接住印 [skip]，
+    其他資料集照跑，不會整批停下來。
+    """
+    for name in ROUTING_BENCHES:
+        module = importlib.import_module(f"{name}_routing")
+        module.DATA_DIR = module.DATA_DIR + CN_SUFFIX
+        bench = next(v for v in vars(module).values() if isinstance(v, Bench))
+        bench.name += CN_SUFFIX
+    _routing_rows.cache_clear()  # 同一個 process 裡換過語言時，不要拿到英文版的快取
 
 
 # ---- 各種檔案格式的讀取小工具：都回傳「每題一條字串」的 list ----
@@ -431,3 +528,312 @@ DATASETS = [
     DS("AIME", "fast-powerful", lambda: routing_prompts("aime"), False, False, lambda: routing_gold("aime")),
     DS("GSM8K", "fast-powerful", lambda: routing_prompts("gsm8k"), False, False, lambda: routing_gold("gsm8k")),
 ]
+
+
+# ============================================================================
+# 來源：deep12.py 第 104-360 行 —— run / status 的流程本體
+# ============================================================================
+HERE = os.path.dirname(os.path.abspath(__file__))
+RESULT_DIR = os.path.join(HERE, "deep12_results")
+
+# result 檔的格式版本。格式改了就加一，舊檔會被當成不能用（印出來叫使用者重跑那個資料集），
+# 而不是靜悄悄少欄位算出錯的數字。
+#   1 → 2  四個答案各加兩個 confidence 欄位（見 unpack()）
+#          後來拿掉 <名稱>_conf_api（服務回傳的 p_max）：classifier_jevk5 已改成文件公式，
+#          它和 <名稱>_conf 變成同一個值。<名稱>_conf 的算法沒變，所以舊檔照用、不用加版本
+SCHEMA = 2
+
+CATEGORIES = ("safety", "jailbreak", "injection", "cyber", "coding", "skill", "fast-powerful")
+
+# 一次問幾題就存一次檔。--full 跑 APPS 這種上萬題的資料集時，中斷不會整個資料集白跑。
+CHUNK = 40
+
+
+# ---- confidence ----
+# choice_confidence / score_confidence / noul_confidence 從 classifier_jevk5 import，
+# 全 repo 只有那一份實作（https://docs.typesafe.ai/confidence 的公式）：
+#   Choice  (n·p_max - 1) / (n - 1)
+#   Score   max(0, 1 - Σ pᵢ·|i - m| / MAD_uniform)
+#   Noul    |2p - 1|
+#
+# 為什麼要另外算、不直接用服務的 confidence：本機 jevk5 服務回傳的 confidence 實測等於 p_max，
+# 不是文件公式（毒品成癮小說那題 severity：p_max 0.8097、文件公式 0.5287）。
+# JevK5Classifier 現在已經照文件公式重算，這裡直接呼叫同一組函式，數值和 .confidence 一致。
+
+
+def unpack(response):
+    """把 jevk5 的回應攤成 row 要存的欄位。
+
+    和 deep11.unpack() 的差別只有 confidence：四個答案各多一欄 <名稱>_conf，
+    用 classifier_jevk5 的文件公式算。
+    """
+    refuse = response.nouls["refuse"]
+    coding = response.nouls["coding"]
+    severity = response.scores["severity"]
+    route = response.choices["model_route"]
+    # Score 的機率要照等級 0..n-1 排好才能算 confidence
+    sev_probs = [severity.probabilities[k] for k in sorted(severity.probabilities)]
+    route_probs = list(route.probabilities.values())
+    return {
+        "noul": refuse.noul,
+        "noul_conf": noul_confidence(refuse.noul),
+        "score": severity.score,
+        "probs": dict(severity.probabilities),
+        "score_conf": score_confidence(sev_probs),
+        "coding": coding.noul,
+        "coding_conf": noul_confidence(coding.noul),
+        "route": route.choice,
+        # P(powerful)：model_route 是 Choice，但有機率分佈，所以也能像 Noul 一樣掃門檻
+        "route_p": route.probabilities["powerful"],
+        "route_conf": choice_confidence(route_probs),
+    }
+
+
+def ask(classifier, prompts, isolate):
+    """問 jevk5 四個問題，回傳每題一個 dict（欄位見 unpack）。
+
+    和 deep11.ask() 同一套流程，只是改用本檔的 unpack（deep11 的那個不帶 confidence）。
+    """
+    questions = triage_questions()
+    if not isolate:
+        # 四個問題放同一個請求，和 deep9 的 before_agent 一字不差
+        responses = classifier.batch(
+            [{"state": HumanMessage(p), "questions": questions} for p in prompts],
+            config={"max_concurrency": 8},
+        )
+        return [unpack(r) for r in responses]
+    # 分開問：四次 batch，每次只帶一個問題，再把四份答案併回同一個 row
+    parts = {}
+    for name in QUESTION_NAMES:
+        parts[name] = classifier.batch(
+            [{"state": HumanMessage(p), "questions": {name: questions[name]}} for p in prompts],
+            config={"max_concurrency": 8},
+        )
+    out = []
+    for i in range(len(prompts)):
+        # 併成一個長得像單一請求回應的物件，就能共用同一個 unpack
+        merged = types.SimpleNamespace(
+            nouls={"refuse": parts["refuse"][i].nouls["refuse"],
+                   "coding": parts["coding"][i].nouls["coding"]},
+            scores={"severity": parts["severity"][i].scores["severity"]},
+            choices={"model_route": parts["model_route"][i].choices["model_route"]},
+        )
+        out.append(unpack(merged))
+    return out
+
+
+# ---- result 檔 ----
+def result_path(name, isolate):
+    # --cn 時檔名加 _cn（AdvBench → AdvBench_cn.json），和英文版並存在同一個 deep12_results/。
+    # 後綴只加在檔名上，不動 d.name：抽樣 seed 是 f"{SAMPLE_SEED}-{d.name}"，
+    # 名稱一旦變了就會抽到不同的題目，中英文就比不了同一批題。
+    safe = re.sub(r"[^0-9A-Za-z._-]", "_", name + (CN_SUFFIX if CN else ""))
+    return os.path.join(RESULT_DIR, f"{safe}.isolate.json" if isolate else f"{safe}.json")
+
+
+def load_result(name, isolate):
+    """讀一個資料集的 result。檔案不在、格式版本不符、壞掉都回 None（當成還沒跑）。"""
+    path = result_path(name, isolate)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            res = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[warn] {name} 的 result 讀不起來（{type(e).__name__}: {e}），當成還沒跑")
+        return None
+    if res.get("schema") != SCHEMA:
+        print(f"[warn] {name} 的 result 是舊格式（schema {res.get('schema')} != {SCHEMA}），"
+              f"請用 --refresh 重跑這個資料集")
+        return None
+    # JSON 的 key 一定是字串，severity 的等級還原成 int
+    for row in res["rows"].values():
+        row["probs"] = {int(k): v for k, v in row["probs"].items()}
+    return res
+
+
+def save_result(res):
+    """先寫暫存檔再 rename：寫到一半被中斷時，原本那份 result 還是完整的。"""
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    path = result_path(res["meta"]["dataset"], res["meta"]["isolate"])
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(res, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+# ---- 第一階段：各自跑完、各自存 result ----
+def pick_datasets(args):
+    """照 --only / --category 挑資料集；沒有明確答案（expect_refuse=None）的不列入。"""
+    datasets = [d for d in DATASETS if d.expect_refuse is not None]
+    if args.category:
+        datasets = [d for d in datasets if d.category in args.category]
+    if args.only:
+        want = set(args.only)
+        datasets = [d for d in datasets if d.name in want]
+        missing = want - {d.name for d in datasets}
+        if missing:
+            raise SystemExit(f"沒有這些資料集（或它們的 expect_refuse 是 None）：{'、'.join(sorted(missing))}")
+    if not datasets:
+        raise SystemExit("--only / --category 沒有選到任何資料集")
+    return datasets
+
+
+def sample_prompts(d, args):
+    """讀資料集、照 deep11 的規則抽樣。seed 帶資料集名稱，所以抽到哪些題目和一起跑了誰無關。"""
+    prompts = [p for p in d.load() if isinstance(p, str) and p.strip()]
+    if not prompts:
+        return []
+    if not args.full and len(prompts) > args.n:
+        prompts = random.Random(f"{SAMPLE_SEED}-{d.name}").sample(prompts, args.n)
+    return prompts
+
+
+def run_dataset(d, args, classifier):
+    """把一個資料集跑完、存成一份 result。回傳 (result, 這次新問了幾題)。"""
+    prompts = sample_prompts(d, args)
+    if not prompts:
+        print(f"[skip] {d.name}: 沒有資料")
+        return None, 0
+
+    old = None if args.refresh else load_result(d.name, args.isolate)
+    rows = old["rows"] if old else {}
+
+    # coding 的標準答案是資料集層級的；model_route 的實測標籤是逐題的（只有 fast-powerful 那類有）
+    route_gold = d.route_gold() if d.route_gold else {}
+
+    todo = [p for p in prompts if prompt_key(d.name, p) not in rows]
+    n_new = 0
+    if todo:
+        print(f"問 jevk5 {d.name}：{len(todo)} 題"
+              f"（result 裡已有 {len(prompts) - len(todo)} 題）", flush=True)
+    for i in range(0, len(todo), CHUNK):
+        chunk = todo[i:i + CHUNK]
+        for p, got in zip(chunk, ask(classifier, chunk, args.isolate)):
+            rows[prompt_key(d.name, p)] = {
+                "prompt": p[:400],
+                "coding_gold": d.expect_coding,
+                "route_gold": route_gold.get(p),
+                **got,
+            }
+        n_new += len(chunk)
+        # 每問完一批就把整份 result 重寫一次：中斷時已經問過的那幾批留得下來
+        save_result(build_result(d, args, rows, prompts))
+        print(f"  {d.name} {min(i + CHUNK, len(todo))}/{len(todo)}", flush=True)
+
+    res = build_result(d, args, rows, prompts)
+    save_result(res)
+    print(f"  {d.name} 完成：{len(prompts)} 題（新問 {n_new}）"
+          f" → {os.path.relpath(result_path(d.name, args.isolate), HERE)}", flush=True)
+    return res, n_new
+
+
+def build_result(d, args, rows, prompts):
+    """rows 是這個資料集問過的所有題目（池子），sample 是這次抽樣選中的那些。"""
+    return {
+        "schema": SCHEMA,
+        "meta": {
+            "dataset": d.name,
+            # 中英文的 meta.dataset 都是原本的名字（save_result 要靠它算回檔名，
+            # 而且報表才對得起來）；是哪一版看 lang，檔名也帶 _cn
+            "lang": "cn" if CN else "en",
+            "category": d.category,
+            # 三種資料集層級的標籤一起存進來，第二階段就不需要再讀 DATASETS
+            "harmful": d.expect_refuse,
+            "coding_gold": d.expect_coding,
+            "route_expect": d.expect_route,
+            "has_route_gold": d.route_gold is not None,
+            "isolate": args.isolate,
+            "seed": SAMPLE_SEED,
+            "n": None if args.full else args.n,
+            "full": args.full,
+            "updated": datetime.now().isoformat(timespec="seconds"),
+        },
+        "rows": rows,
+        "sample": [prompt_key(d.name, p) for p in prompts],
+    }
+
+
+def cmd_run(args):
+    datasets = pick_datasets(args)
+    print(f"第一階段：{len(datasets)} 個資料集，"
+          f"{'全部題目' if args.full else f'每個抽 {args.n} 題'}，"
+          f"{'四個問題分開問' if args.isolate else '四個問題同一個請求'}")
+    classifier = JevK5Classifier(timeout=600)
+    t0 = time.time()
+    done = total_new = 0
+    for d in datasets:
+        try:
+            res, n_new = run_dataset(d, args, classifier)
+        except Exception as e:  # noqa: BLE001
+            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 49 個跟著停
+            print(f"[skip] {d.name}: {type(e).__name__}: {e}")
+            continue
+        if res is None:
+            continue
+        done += 1
+        total_new += n_new
+    print(f"\n第一階段結束：{done}/{len(datasets)} 個資料集有 result，"
+          f"這次新問 {total_new} 題，花了 {time.time() - t0:.0f} 秒")
+    print(f"result 在 {os.path.relpath(RESULT_DIR, HERE)}/，接著跑："
+          f" python deep12.py report{' --isolate' if args.isolate else ''}")
+
+
+# ---- status ----
+def cmd_status(args):
+    datasets = pick_datasets(args)
+    print(f"  {'資料集':<26}{'類別':<16}{'題數':>6}{'池子':>6}  抽樣        更新時間")
+    have = 0
+    for d in datasets:
+        res = load_result(d.name, args.isolate)
+        if res is None:
+            print(f"  {d.name:<26}{d.category:<16}{'-':>6}{'-':>6}  （還沒跑）")
+            continue
+        have += 1
+        m = res["meta"]
+        taken = "全部" if m["full"] else f"抽 {m['n']}"
+        print(f"  {d.name:<26}{d.category:<16}{len(res['sample']):>6}{len(res['rows']):>6}"
+              f"  {taken:<10}  {m['updated']}")
+    print(f"\n{have}/{len(datasets)} 個資料集有 result"
+          f"（{'分開問' if args.isolate else '同一個請求'}）")
+
+
+# ============================================================================
+# 進入點：只有 run 和 status；report 留在 deep12.py / deep13.py
+# ============================================================================
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def common(p):
+        p.add_argument("--only", nargs="+", help="只處理指定名稱的資料集")
+        p.add_argument("--category", nargs="+", choices=CATEGORIES, help="只處理這些類別")
+        p.add_argument("--isolate", action="store_true",
+                       help="四個問題分成四次請求問（result 另存一份，report 也要加這個才讀得到）")
+        p.add_argument("--cn", action="store_true",
+                       help="改讀 translate_cn.py 產出的中文版資料集（根目錄加 _cn），"
+                            "result 存成 <資料集>_cn.json")
+
+    p_run = sub.add_parser("run", help="各資料集各自問完 jevk5、各自存成 result")
+    common(p_run)
+    p_run.add_argument("-n", type=int, default=80, help="每個資料集抽樣題數（預設 80）")
+    p_run.add_argument("--full", action="store_true", help="不抽樣，全部跑")
+    p_run.add_argument("--refresh", action="store_true", help="丟掉既有的 result，重新問 jevk5")
+    p_run.set_defaults(func=cmd_run)
+
+    p_st = sub.add_parser("status", help="看哪些資料集已經有 result")
+    common(p_st)
+    p_st.set_defaults(func=cmd_status)
+
+    args = ap.parse_args()
+    if args.cn:
+        # 在跑任何東西之前切換根目錄：DATASETS 的 lambda 是呼叫時才展開 f-string，所以來得及
+        use_cn_datasets()
+        print(f"資料集：中文版（{CN_SUFFIX}）　result："
+              f"{os.path.relpath(RESULT_DIR, HERE)}/<資料集>{CN_SUFFIX}.json")
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

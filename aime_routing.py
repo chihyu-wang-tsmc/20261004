@@ -23,6 +23,11 @@ import re
 
 from routing_bench import HERE, Bench, main
 
+DATA_DIR = os.path.join(HERE, "aime")
+"""題目檔所在的目錄。load_questions() 每次呼叫才組路徑，所以這個常數可以在 import 之後改掉：
+deep14.py --cn 會把它指到 aime_cn/（translate_cn.py 產出的中文版），同時把 Bench.name 改成
+aime_cn，讓 answers_dir 一起指到 aime_cn/answers/。"""
+
 YEARS = ("2025", "2026")
 
 # MathArena 的 AIME 提示
@@ -38,7 +43,7 @@ def load_questions(args):
     years = YEARS if args.year == "all" else (args.year,)
     questions = []
     for year in years:
-        with open(os.path.join(HERE, "aime", f"aime_{year}.jsonl"), encoding="utf-8") as f:
+        with open(os.path.join(DATA_DIR, f"aime_{year}.jsonl"), encoding="utf-8") as f:
             for line in f:
                 row = json.loads(line)
                 idx = int(row["problem_idx"])

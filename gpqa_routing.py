@@ -23,7 +23,10 @@ import re
 
 from routing_bench import HERE, Bench, main
 
-CSV_PATH = os.path.join(HERE, "gpqa", "gpqa_diamond.csv")
+DATA_DIR = os.path.join(HERE, "gpqa")
+"""題目檔所在的目錄。load_questions() 每次呼叫才組路徑，所以這個常數可以在 import 之後改掉：
+deep14.py --cn 會把它指到 gpqa_cn/（translate_cn.py 產出的中文版），同時把 Bench.name 改成
+gpqa_cn，讓 answers_dir 一起指到 gpqa_cn/answers/。"""
 
 # simple-evals 的 GPQA zero-shot CoT 提示
 PROMPT = """Answer the following multiple choice question. The last line of your response should be of the following format: 'Answer: $LETTER' (without quotes) where LETTER is one of ABCD. Think step by step before answering.
@@ -40,7 +43,7 @@ ANSWER_RE = re.compile(r"(?i)answer\s*[:：]\s*\**\s*\(?\$?([ABCD])\b")
 
 def load_questions(args):
     """讀 GPQA-Diamond，每題的選項用 Record ID 當 seed 打亂，所以每個 model、每次執行看到的順序都一樣。"""
-    with open(CSV_PATH, encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, "gpqa_diamond.csv"), encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     questions = []
     for row in rows:

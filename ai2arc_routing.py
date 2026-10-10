@@ -32,6 +32,11 @@ import re
 
 from routing_bench import HERE, Bench, main
 
+DATA_DIR = os.path.join(HERE, "ai2arc")
+"""題目檔所在的目錄。load_questions() 每次呼叫才組路徑，所以這個常數可以在 import 之後改掉：
+deep14.py --cn 會把它指到 ai2arc_cn/（translate_cn.py 產出的中文版），同時把 Bench.name 改成
+ai2arc_cn，讓 answers_dir 一起指到 ai2arc_cn/answers/。"""
+
 SUBSETS = ("challenge", "easy")
 TITLES = {"challenge": "ARC-Challenge", "easy": "ARC-Easy"}
 
@@ -53,7 +58,7 @@ def load_questions(args):
     subsets = SUBSETS if args.subset == "all" else (args.subset,)
     questions = []
     for subset in subsets:
-        path = os.path.join(HERE, "ai2arc", f"arc_{subset}_test.jsonl")
+        path = os.path.join(DATA_DIR, f"arc_{subset}_test.jsonl")
         with open(path, encoding="utf-8") as f:
             rows = [json.loads(line) for line in f if line.strip()]
         if args.n:

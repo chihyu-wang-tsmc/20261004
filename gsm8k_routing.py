@@ -30,7 +30,10 @@ import re
 from aime_routing import last_boxed  # 同樣的 \boxed{...} 解析（處理巢狀大括號）
 from routing_bench import HERE, Bench, main
 
-JSONL_PATH = os.path.join(HERE, "gsm8k", "gsm8k_test.jsonl")
+DATA_DIR = os.path.join(HERE, "gsm8k")
+"""題目檔所在的目錄。load_questions() 每次呼叫才組路徑，所以這個常數可以在 import 之後改掉：
+deep14.py --cn 會把它指到 gsm8k_cn/（translate_cn.py 產出的中文版），同時把 Bench.name 改成
+gsm8k_cn，讓 answers_dir 一起指到 gsm8k_cn/answers/。"""
 
 # 抽題用的 seed，換掉就會抽到不同的題目（已經跑過的答案就對不上了，不要隨便改）
 SAMPLE_SEED = 20251004
@@ -49,7 +52,7 @@ def steps_group(steps):
 
 def load_questions(args):
     """讀 GSM8K test split；--n 用固定 seed 抽樣，抽完照原本的順序排，所以每次執行都一樣。"""
-    with open(JSONL_PATH, encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, "gsm8k_test.jsonl"), encoding="utf-8") as f:
         rows = [json.loads(line) for line in f if line.strip()]
     if args.n:
         picked = set(random.Random(SAMPLE_SEED).sample(range(len(rows)), min(args.n, len(rows))))
