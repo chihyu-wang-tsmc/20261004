@@ -101,13 +101,23 @@ _cn 的檔名（例如把 result_path 的規則一起帶過去）。
 deep20_results/，而 deep12.py / deep13.py 的 report 讀的是寫死的 deep12_results/，
 所以要算本檔的報表，得先讓它們指到 deep20_results/（改那個常數，或把目錄換名）。
 
-本檔的組成，每一段都和來源一字不差：
+本檔的組成，每一段都和來源一字不差（只有兩個名字例外，見下）：
     原 deep11   SAMPLE_SEED、QUESTION_NAMES、prompt_key
-    原 deep19   守門問題與 route()（INPUT_BATTERY / OUTPUT_BATTERY / guard_decision…）
+    原 deep19   守門問題與 guard_action()（INPUT_BATTERY / OUTPUT_BATTERY / guard_decision…）
     原 deep10   路徑常數、各格式 loader、routing 標準答案、DS、DATASETS（50 個資料集）
     原 deep12   HERE/RESULT_DIR/SCHEMA/CATEGORIES/CHUNK、unpack、ask、result_path、
                 load_result、save_result、pick_datasets、sample_prompts、run_dataset、
                 build_result、cmd_run、cmd_status（即 deep12.py 的第 104-360 行）
+
+和來源唯一的差異是守門那兩個名字（邏輯一行沒動，對照 deep19 / llm_guardrails.py 時換回去就一樣）：
+
+    route()      → guard_action()        決定 pass / review / block
+    PRECEDENCE   → ACTION_PRECEDENCE     三個動作的優先序
+
+原名和本檔的 model_route 字面相撞——deep19 只有守門一種 route，本檔卻同時有「擋不擋」和
+「交給哪個 model」兩種，unpack_in() 裡本來還得加一行註解提醒別把守門的 route 蓋掉。
+guard_* 這組字首也和既有的 guard_decision / GUARD_POLICY / row 的 guard 欄位對齊。
+注意 row 的 "route" 欄位沒有改名，它存的是 model_route 的答案，名字本來就是對的。
 
 `python deep20.py run` 的呼叫順序：
 
@@ -168,18 +178,18 @@ def prompt_key(dataset, prompt):
 
 
 # ============================================================================
-# 來源：deep19.py —— 守門問題與 route()（和 deep19 一字不差）
+# 來源：deep19.py —— 守門問題與 guard_action()（和 deep19 一字不差，只有兩個名字改了，見檔頭）
 # ============================================================================
 # deep14 問的是 deep9 的四題（model_route / coding / refuse / severity）；
 # 本檔把 refuse 和 deep9 版 severity 拿掉，換成 deep19 的 INPUT_BATTERY / OUTPUT_BATTERY，
 # 而且不是一次問完——照 deep19 的流程分兩次問，中間夾一次真正的模型呼叫。
 
 # ---- from llm_guardrails 搬進來 ----
-# 以下 noul / SEVERITY / INPUT_BATTERY / OUTPUT_BATTERY / HAZARD_ACTION / PRECEDENCE /
-# POLICIES / DEFAULT_POLICY / route 原本在 llm_guardrails.py（TypeSafe cookbook），
-# 搬進本檔，不再 import llm_guardrails。
+# 以下 noul / SEVERITY / INPUT_BATTERY / OUTPUT_BATTERY / HAZARD_ACTION / ACTION_PRECEDENCE /
+# POLICIES / DEFAULT_POLICY / guard_action 原本在 llm_guardrails.py（TypeSafe cookbook），
+# 搬進本檔，不再 import llm_guardrails。cookbook 的原名是 route / PRECEDENCE（見檔頭）。
 # 與 llm_guardrails.py 的差別：INPUT_BATTERY / OUTPUT_BATTERY / HAZARD_ACTION 拿掉了
-# medical_advice 和 self_harm，PRECEDENCE 連帶拿掉只由 self_harm 觸發的 support。
+# medical_advice 和 self_harm，ACTION_PRECEDENCE 連帶拿掉只由 self_harm 觸發的 support。
 
 
 def noul(instructions: str, yes: str, no: str) -> Noul:
@@ -234,7 +244,7 @@ HAZARD_ACTION = {
     "broke_policy": "block",
     "harmful_request": "block",
 }
-PRECEDENCE = ["block", "review", "pass"]  # 前面的優先（support 隨 self_harm 一起移除）
+ACTION_PRECEDENCE = ["block", "review", "pass"]  # 前面的優先（support 隨 self_harm 一起移除）
 
 POLICIES = {
     "strict": {"review_threshold": 0.35, "action_threshold": 0.70, "severity_block": 2.0},
@@ -243,8 +253,12 @@ POLICIES = {
 DEFAULT_POLICY = "strict"
 
 
-def route(nouls: dict[str, float], severity: float, policy: dict) -> str:
-    """一則訊息的 jevk5 評估 → 這個政策下的一個動作。"""
+def guard_action(nouls: dict[str, float], severity: float, policy: dict) -> str:
+    """一則訊息的 jevk5 評估 → 這個政策下的一個守門動作（pass / review / block）。
+
+    和 model_route 無關：這裡決定的是「要不要擋」，model_route 決定的是「交給哪個 model」。
+    cookbook（llm_guardrails.py）裡這個函式叫 route()，本檔改名就是為了不和它相撞。
+    """
     triggered = []
     for hazard, probability in nouls.items():
         if probability >= policy["action_threshold"]:
@@ -253,7 +267,7 @@ def route(nouls: dict[str, float], severity: float, policy: dict) -> str:
             triggered.append("review")
     if severity >= policy["severity_block"]:
         triggered = ["block" if action == "review" else action for action in triggered]
-    return next((action for action in PRECEDENCE if action in triggered), "pass")
+    return next((action for action in ACTION_PRECEDENCE if action in triggered), "pass")
 
 
 # ---- from llm_guardrails 搬進來結束 ----
@@ -300,13 +314,13 @@ def triage_questions():
 
 
 def guard_decision(response, battery) -> tuple[dict[str, float], ScoreAnswer, str, str | None]:
-    """從 jevk5 的回應取出 battery 裡的危害機率和 severity，用 cookbook 的 route() 決定動作。
+    """從 jevk5 的回應取出 battery 裡的危害機率和 severity，用 guard_action() 決定動作。
 
     回傳 (各危害機率, severity 完整答案, 動作, 機率最高的危害)；動作是 pass 時危害是 None。
     """
     hazards = {name: response.nouls[name].noul for name in battery if name != "severity"}
     severity = response.scores["severity"]
-    action = route(hazards, severity.score, POLICIES[GUARD_POLICY])
+    action = guard_action(hazards, severity.score, POLICIES[GUARD_POLICY])
     top = max(hazards, key=hazards.get) if action != "pass" else None
     return hazards, severity, action, top
 
@@ -713,14 +727,13 @@ def unpack_in(response):
     """輸入端那次 jevk5 的回應 → row 的欄位。
 
     欄位刻意維持 deep14 / deep12 的形狀（noul / score / probs / coding / route），報表才不用改：
-        noul   不再是 refuse 的 P(yes)，改成「輸入端各危害的最大機率」——deep19 的 route()
+        noul   不再是 refuse 的 P(yes)，改成「輸入端各危害的最大機率」——守門的 guard_action()
                也是看有沒有任何危害跨過 action_threshold 才決定要不要擋，這是最接近的對應物。
         score  仍是 severity，但換成 cookbook 那組等級文字，不是 deep9 的 SEVERITY_LEVELS。
     每個危害另外各存一欄原始機率和 confidence（in_*）。
     """
     hazards, severity, action, top = guard_decision(response, INPUT_BATTERY)
     coding = response.nouls["coding"]
-    # 注意不要叫 route：那是上面守門用的函式名，會被蓋掉
     route_answer = response.choices["model_route"]
     sev_probs = [severity.probabilities[k] for k in sorted(severity.probabilities)]
     top_p = max(hazards.values())

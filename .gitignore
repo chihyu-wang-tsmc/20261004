@@ -1,2 +1,12 @@
 dataset_samples_cache/
 translate_cn_state/
+
+__pycache__/
+pw.txt
+.env
+
+# deep20_report.py 的產物（PNG / xlsx），每次跑都會重生，不入版控
+deep20_report/
+
+# LiveCodeBench 的題目檔，129MB，超過 GitHub 單檔 100MB 上限
+test6.jsonl
