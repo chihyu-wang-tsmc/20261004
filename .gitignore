@@ -8,8 +8,9 @@ pw.txt
 # deep20_report.py 的產物（PNG / xlsx），每次跑都會重生，不入版控
 deep20_report/
 
-# deep20_guard_report.py 的 Excel 每次重生，不入版控；labels.csv 是人工標註，要留
+# deep20_guard_report.py 的 Excel / PNG 每次重生，不入版控；labels.csv 是人工標註，要留
 deep20_guard_report/tables*.xlsx
+deep20_guard_report/tradeoff*.png
 
 # LiveCodeBench 的題目檔，129MB，超過 GitHub 單檔 100MB 上限
 test6.jsonl
