@@ -55,6 +55,8 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/fig1_main_tau_axis_conf.png  同上，上方同時標 τ 與 route_conf（做法 C2）
     deep20_report/fig2_per_bench.png  正文圖 2：四個 bench 分開看
     deep20_report/fig2_per_bench_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
+    deep20_report/fig2_per_bench_zoom.png   同上，Y 軸每格各自從藍線附近開始（跨距各格不同）
+    deep20_report/fig2_per_bench_zoom_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
     deep20_report/fig2_per_bench_norm.png   同上，Y 改成「補回 oracle 差距的比例」，四格同一把尺
     deep20_report/fig2_per_bench_norm_tau_axis.png   同上，上方標 τ
     deep20_report/fig3_routep.png     正文圖 3：route_p 按 ground truth 分層
@@ -872,38 +874,35 @@ def _acc_range(a):
             max(a["ceiling"], a["router"]["acc"].max()))
 
 
-def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, norm=False):
-    """正文圖 2：四個 bench 分開。Y 軸各格自訂起點，但四格共用同一個跨距，斜率才可比。
+def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fixed"):
+    """正文圖 2：四個 bench 分開。y 決定 Y 軸怎麼取，三種各存一張：
 
-    跨距由資料決定：每格「資料範圍 × 1.25」取四格裡最大的，無條件進位到整數百分點。
-    原本寫死 20 個百分點，是舊配對（AIME 落差 46 pp）留下的；落差只剩十幾分時會把每格都壓扁。
-    不能每格各自放大：AI2ARC 整段落差 0.5 分，放大到填滿一格，看起來會和 AIME 的 11.7 分
-    一樣陡，讀者會以為 routing 在兩邊一樣重要。
-
-    norm=True 是另一張圖（fig2_per_bench_norm）：Y 改成「補回 oracle 差距的比例」
+    y="fixed"（fig2_per_bench）：Y 軸各格自訂起點，但跨距一律 20 個百分點，斜率才可比。
+    y="zoom"（fig2_per_bench_zoom）：每格各自從藍線附近開始，範圍跟著 result 走
+        （藍線、全送 fast、oracle 天花板的範圍，上下各留 12.5%）。看得到 AI2ARC / GSM8K
+        的細節，但各格跨距不同，高度和斜率不能跨格比：AI2ARC 整段落差 0.5 分，放大後會和
+        AIME 的 11.7 分一樣佔滿一格。所以標題寫出跨距和「一題是幾分」。
+    y="norm"（fig2_per_bench_norm）：Y 改成「補回 oracle 差距的比例」
         (acc − acc_fast) / (ceiling − acc_fast)      0 = 全送 fast，1 = oracle 天花板
-    四格在同一把尺上，比的是 router 的排序能力。分母用天花板而不是全送 powerful：GSM8K
-    兩個 model 正確率一樣，用後者分母會是 0。差距本身多大寫在各格標題。
-    曲線可以低於 0：先升級到「fast 對、powerful 錯」的題目時就會。
+        四格在同一把尺上，比的是 router 的排序能力。分母用天花板而不是全送 powerful：GSM8K
+        兩個 model 正確率一樣，用後者分母會是 0。差距本身多大寫在各格標題。
+        曲線可以低於 0：先升級到「fast 對、powerful 錯」的題目時就會。
     """
     import matplotlib.pyplot as plt
-    if norm and tau == "curve":
+    if y == "norm" and tau == "curve":
         raise ValueError("norm 版只支援 tau=None / 'axis'：曲線上的 τ 記號畫的是原始正確率")
     names = list(per_bench)
     fig, axes = plt.subplots(2, 2, figsize=(9.4, 6.6))
 
     def scale(a):
-        if not norm:
-            return lambda y: np.asarray(y)
+        if y != "norm":
+            return lambda v: np.asarray(v)
         gap = a["ceiling"] - a["acc_fast"]
-        return lambda y: (np.asarray(y) - a["acc_fast"]) / gap if gap > 0 else np.zeros_like(y)
+        return lambda v: (np.asarray(v) - a["acc_fast"]) / gap if gap > 0 else np.zeros_like(v)
 
-    if norm:
+    if y == "norm":
         y_lo = min(0.0, *(float(scale(a)(a["router"]["acc"]).min()) for a in per_bench.values()))
         y_lo, y_hi = y_lo - 0.08, 1.08
-    else:
-        span = max((hi - lo) * 1.25 for lo, hi in map(_acc_range, per_bench.values()))
-        span = max(0.02, math.ceil(span * 100) / 100)
 
     for ax, name in zip(axes.ravel(), names):
         a = per_bench[name]
@@ -922,13 +921,23 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, norm=
         ax.plot([1], [f(a["acc_pow"])], "o", ms=6, color=c["ink"],
                 markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=5)
 
-        if norm:
+        lo_d, hi_d = _acc_range(a)
+        if y == "norm":
             lo, hi = y_lo, y_hi
-            q = a["quad"]
             title = (f"{name.upper()}　n = {a['n']}　"
-                     f"gap {a['ceiling'] - a['acc_fast']:.1%} = {q['pow_only']} items")
+                     f"gap {a['ceiling'] - a['acc_fast']:.1%} = {a['quad']['pow_only']} items")
+        elif y == "zoom":
+            pad = max((hi_d - lo_d) * 0.125, 0.002)
+            lo, hi = max(0.0, lo_d - pad), hi_d + pad
+            if hi_d < 1.0:
+                hi = min(hi, 1.0)
+            title = (f"{name.upper()}　n = {a['n']}　"
+                     f"(Y span {hi - lo:.1%}, 1 item = {1 / a['n']:.2%})")
         else:
-            lo_d, hi_d = _acc_range(a)
+            # Y 軸跨距：預設 20 個百分點，但資料範圍超過時以資料為準（AIME 的落差有 46 pp，
+            # 硬套 20 pp 會把曲線截掉）。跨距不同的那幾格，斜率就不能和其他格直接比，
+            # 所以把實際跨距寫進各格標題。
+            span = max(0.20, (hi_d - lo_d) * 1.25)
             lo = max(0.0, min(lo_d - (span - (hi_d - lo_d)) / 2, 1 - span))
             hi = lo + span
             title = f"{name.upper()}　n = {a['n']}　(Y span {span:.0%})"
@@ -971,7 +980,7 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, norm=
                                   label="threshold τ (every 0.1)"))
     fig.legend(handles=handles, loc="lower center", ncols=len(handles),
                labelcolor=c["ink2"], fontsize=9, bbox_to_anchor=(0.5, -0.03))
-    if norm:  # 這張的 Y 不是正確率，不標會被當成正確率讀
+    if y == "norm":  # 這張的 Y 不是正確率，不標會被當成正確率讀
         fig.supylabel("share of oracle gap recovered", color=c["ink2"], fontsize=9.5)
     # 和圖 1 一致：標題與頁尾說明不畫在圖上，留給報告的圖說
     fig.tight_layout(rect=(0, 0.02, 1, 1))
@@ -1521,22 +1530,23 @@ def cmd_report(args):
     # 乾淨版（不標 τ）一定產出；再按 --tau 另存標了 τ 的版本，檔名加後綴，不覆蓋
     fig1_main(a, c, os.path.join(args.out, f"fig1_main{sfx}.png"), **kw)
     fig2_per_bench(per_bench, c, os.path.join(args.out, f"fig2_per_bench{sfx}.png"), **kw)
-    fig2_per_bench(per_bench, c, os.path.join(args.out, f"fig2_per_bench_norm{sfx}.png"),
-                   norm=True, **kw)
+    for y in ("zoom", "norm"):
+        fig2_per_bench(per_bench, c, os.path.join(args.out, f"fig2_per_bench_{y}{sfx}.png"),
+                       y=y, **kw)
     for variant in (list(TAU_VARIANTS) if args.tau == "all" else
                     [] if args.tau == "none" else [args.tau]):
         stem = variant.replace("-", "_")
         fig1_main(a, c, os.path.join(args.out, f"fig1_main_tau_{stem}{sfx}.png"),
                   tau=variant, **kw)
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
+        # 曲線上的 τ 記號畫的是原始正確率，所以 norm 版只出 axis
         if variant != "axis-conf":
-            fig2_per_bench(per_bench, c,
-                           os.path.join(args.out, f"fig2_per_bench_tau_{stem}{sfx}.png"),
-                           tau=variant, **kw)
-        if variant == "axis":  # 曲線上的 τ 記號畫的是原始正確率，norm 版只出 axis
-            fig2_per_bench(per_bench, c,
-                           os.path.join(args.out, f"fig2_per_bench_norm_tau_axis{sfx}.png"),
-                           tau=variant, norm=True, **kw)
+            for y, tag in (("fixed", ""), ("zoom", "_zoom"), ("norm", "_norm")):
+                if y == "norm" and variant != "axis":
+                    continue
+                fig2_per_bench(per_bench, c,
+                               os.path.join(args.out, f"fig2_per_bench{tag}_tau_{stem}{sfx}.png"),
+                               tau=variant, y=y, **kw)
     fig3_routep(data, a, c, os.path.join(args.out, f"fig3_routep{sfx}.png"))
     figA1_y_axis(a, c, os.path.join(args.out, f"figA1_y_axis{sfx}.png"))
     figA2_calibration(a, c, os.path.join(args.out, f"figA2_calibration{sfx}.png"))
