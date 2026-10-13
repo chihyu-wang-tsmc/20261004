@@ -64,15 +64,16 @@ matrix 裡能「調門檻、畫成一條線讓人挑作業點」的是 Recall（
 TPR@FPR=x% 是這條線上的一個點，AUROC 是這條線下的面積；Precision / F1 / Accuracy
 會隨有害題比例變，不適合拿來選門檻。
 
-    X 軸  誤擋率：正常請求被擋下的比例（FPR）
-    Y 軸  擋下率：有害請求被擋下的比例（Recall）
+    X 軸  False-block rate on benign requests (FPR)：正常請求被擋下的比例
+    Y 軸  Block rate on harmful requests (Recall)：有害請求被擋下的比例
     藍線  只開第一道        門檻 τ = action_threshold，從 0.40 掃到 0.98，整條都是確切值
     綠線  兩道都開（同一個 τ）  第二道把每個點往上推（多擋）、往右推一點（多誤擋）
-    點    τ = 0.50 / 0.60 / 0.70 / 0.80 / 0.85 / 0.90 / 0.95；橘圈是目前的 GUARD_POLICY
+    點    τ = 0.50 / 0.60 / 0.70 / 0.80 / 0.85 / 0.90 / 0.95（標在藍線上）
 
 τ 越低越嚴：點往右上走，擋下更多有害、也誤擋更多正常。
-比目前門檻鬆的那幾個 τ，綠線只能畫成空心點 + 誤差線（原本在第一道擋下的題目沒有模型回覆，
-不知道第二道會不會擋），要確切值就用最鬆的門檻重跑一次 deep20，更嚴的門檻都能從那份 result 重播。
+綠線只畫到目前的門檻：比它鬆的 τ，原本在第一道擋下的題目沒有模型回覆，不知道第二道會不會擋，
+只能算出範圍（印在 [G10] 的表裡，圖上不畫）。要確切值就用最鬆的門檻重跑一次 deep20，
+更嚴的門檻都能從那份 result 重播。
 --full 時建議加 --tradeoff-macro（每個資料集一樣重），不然曲線被題數多的資料集主導。
 
 ---- 第二道的標準答案：「回覆是否有害」 ----
@@ -1176,32 +1177,19 @@ def fig_tradeoff(pts, path, dark=False, macro=False):
     d20r.setup_font()
     t = d20r.t
     c = d20r.PALETTE["dark" if dark else "light"]
-    blue, aqua, mark = c["router"], c["oracle"], c["mark"]
-    actual = POLICIES[GUARD_POLICY]["action_threshold"]
+    blue, aqua = c["router"], c["oracle"]
     fig, ax = plt.subplots(figsize=(8.4, 5.8))
     d20r.style_axes(ax, c)
-
-    def mid(lohi):
-        return (lohi[0] + lohi[1]) / 2
 
     # ---- 只開第一道：整條都是確切值 ----
     xs = [pt["g1_fpr"][0] for pt in pts]
     ys = [pt["g1_rec"][0] for pt in pts]
     ax.plot(xs, ys, color=blue, lw=2, zorder=3, label=t("只開第一道（輸入守門）", "Input guard only"))
-    # ---- 兩道都開：確切的部分畫實線，區間的部分畫空心點 + 誤差線 ----
+    # ---- 兩道都開：只畫確切值（門檻不比實際跑的鬆）；更鬆的門檻是範圍，看 [G10] 的表 ----
     ex = [pt for pt in pts if pt["exact"]]
-    ax.plot([pt["sys_fpr"][0] for pt in ex], [pt["sys_rec"][0] for pt in ex], color=aqua, lw=2,
-            zorder=3, label=t("兩道都開（輸入 + 輸出守門）", "Input + output guard"))
-    fuzzy = [pt for pt in pts if not pt["exact"] and pt["tau"] in TRADEOFF_MARKS]
-    if fuzzy:
-        ax.errorbar([mid(pt["sys_fpr"]) for pt in fuzzy], [mid(pt["sys_rec"]) for pt in fuzzy],
-                    xerr=[[mid(pt["sys_fpr"]) - pt["sys_fpr"][0] for pt in fuzzy],
-                          [pt["sys_fpr"][1] - mid(pt["sys_fpr"]) for pt in fuzzy]],
-                    yerr=[[mid(pt["sys_rec"]) - pt["sys_rec"][0] for pt in fuzzy],
-                          [pt["sys_rec"][1] - mid(pt["sys_rec"]) for pt in fuzzy]],
-                    fmt="o", ms=6, mfc=c["surface"], mec=aqua, mew=1.4, ecolor=aqua, elinewidth=0.9,
-                    capsize=0, alpha=0.75, zorder=4,
-                    label=t("兩道都開，範圍（需重跑才能確定）", "Input + output, range (re-run to pin down)"))
+    sx = [pt["sys_fpr"][0] for pt in ex]
+    sy = [pt["sys_rec"][0] for pt in ex]
+    ax.plot(sx, sy, color=aqua, lw=2, zorder=3, label=t("兩道都開（輸入 + 輸出守門）", "Input + output guard"))
 
     # ---- 門檻 τ 的記號：兩條線都畫點，第一道那條標字 ----
     marked = [pt for pt in pts if pt["tau"] in TRADEOFF_MARKS]
@@ -1216,35 +1204,17 @@ def fig_tradeoff(pts, path, dark=False, macro=False):
                     (pt["g1_fpr"][0], pt["g1_rec"][0]), textcoords="offset points",
                     xytext=(7, -12), color=c["ink2"], fontsize=8)
 
-    # ---- 目前的政策：橘色圈 + 第二道帶來的位移 ----
-    cur = next(pt for pt in pts if abs(pt["tau"] - actual) < 1e-9)
-    for x, y in ((cur["g1_fpr"][0], cur["g1_rec"][0]), (mid(cur["sys_fpr"]), mid(cur["sys_rec"]))):
-        ax.plot(x, y, "o", ms=15, mfc="none", mec=mark, mew=2, zorder=6)
-    ax.annotate("", xy=(mid(cur["sys_fpr"]), mid(cur["sys_rec"])),
-                xytext=(cur["g1_fpr"][0], cur["g1_rec"][0]),
-                arrowprops=dict(arrowstyle="->", color=c["muted"], lw=1, shrinkA=9, shrinkB=9), zorder=2)
-    d_rec = mid(cur["sys_rec"]) - cur["g1_rec"][0]
-    d_fpr = mid(cur["sys_fpr"]) - cur["g1_fpr"][0]
-    ax.annotate(t(f"目前 {GUARD_POLICY}（τ={actual:.2f}）\n第二道：擋下 {d_rec:+.1%}、誤擋 {d_fpr:+.1%}",
-                  f"current {GUARD_POLICY} (τ={actual:.2f})\noutput guard: blocked {d_rec:+.1%}, "
-                  f"false blocks {d_fpr:+.1%}"),
-                (mid(cur["sys_fpr"]), mid(cur["sys_rec"])), textcoords="axes fraction",
-                xytext=(0.04, 0.96), color=c["ink"], fontsize=8.5, va="top",
-                # 左上角（誤擋少、擋下多）是理想點，實際曲線碰不到，那裡是空的：說明放那裡，用細線拉回目前的點
-                arrowprops=dict(arrowstyle="-", color=c["muted"], lw=0.8, shrinkB=9))
-
-    # ---- 軸：FPR 通常集中在低端，X 軸只畫到資料的最大值 ----
-    xmax = max([pt["sys_fpr"][1] for pt in pts] + xs)
-    ymin = min([pt["sys_rec"][0] for pt in pts] + ys)
+    # ---- 軸：FPR 通常集中在低端，X 軸只畫到圖上資料的最大值；軸標題一律英文 ----
+    xmax = max(xs + sx)
+    ymin = min(ys + sy)
     ax.set_xlim(-0.005, min(1.0, xmax * 1.12 + 0.01))
     ax.set_ylim(max(0.0, ymin - 0.06), 1.02)
     ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     ax.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
-    ax.set_xlabel(t("誤擋率：正常請求被擋下的比例（FPR）", "False-block rate on benign requests (FPR)"),
+    ax.set_xlabel("False-block rate on benign requests (FPR)", color=c["ink2"])
+    ax.set_ylabel("Block rate on harmful requests (Recall)" + (", dataset-weighted" if macro else ""),
                   color=c["ink2"])
-    ax.set_ylabel(t("擋下率：有害請求被擋下的比例（Recall）", "Block rate on harmful requests (Recall)")
-                  + (t("，每個資料集一樣重", ", dataset-weighted") if macro else ""), color=c["ink2"])
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=3 if fuzzy else 2,
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=2,
               labelcolor=c["ink2"], fontsize=8.5)
     d20r._save(fig, path, c)
 
