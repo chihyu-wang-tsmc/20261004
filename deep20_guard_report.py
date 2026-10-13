@@ -501,7 +501,7 @@ class Report:
             print(line(r))
         self.sheets[sheet].append((title, header, body))
 
-    def write_excel(self, path, rows):
+    def write_excel(self, path, rows, keep=None):
         try:
             import pandas as pd
         except ImportError:
@@ -517,7 +517,7 @@ class Report:
                                                      header=False, startrow=start)
                     df.to_excel(xw, sheet_name=sheet, index=False, startrow=start + 1)
                     start += len(df) + 4
-            keep = ("dataset", "category", "harmful", "key", "g1", "guard_hazard", "noul", "score",
+            keep = keep or ("dataset", "category", "harmful", "key", "g1", "guard_hazard", "noul", "score",
                     *(f"in_{h}" for h in IN_HAZARDS), "route", "called_model", "model", "empty",
                     "refused", "g2", "output_hazard", "out_noul", "out_score",
                     *(f"out_{h}" for h in OUT_HAZARDS), "reply_harmful_heur", "reply_harmful",
@@ -1175,7 +1175,6 @@ def fig_tradeoff(pts, path, dark=False, macro=False):
     import deep20_report as d20r  # 調色盤、字型、坐標軸樣式和 deep20_report 的圖一致
 
     d20r.setup_font()
-    t = d20r.t
     c = d20r.PALETTE["dark" if dark else "light"]
     blue, aqua = c["router"], c["oracle"]
     fig, ax = plt.subplots(figsize=(8.4, 5.8))
@@ -1184,12 +1183,12 @@ def fig_tradeoff(pts, path, dark=False, macro=False):
     # ---- 只開第一道：整條都是確切值 ----
     xs = [pt["g1_fpr"][0] for pt in pts]
     ys = [pt["g1_rec"][0] for pt in pts]
-    ax.plot(xs, ys, color=blue, lw=2, zorder=3, label=t("只開第一道（輸入守門）", "Input guard only"))
+    ax.plot(xs, ys, color=blue, lw=2, zorder=3, label="Input guard only")
     # ---- 兩道都開：只畫確切值（門檻不比實際跑的鬆）；更鬆的門檻是範圍，看 [G10] 的表 ----
     ex = [pt for pt in pts if pt["exact"]]
     sx = [pt["sys_fpr"][0] for pt in ex]
     sy = [pt["sys_rec"][0] for pt in ex]
-    ax.plot(sx, sy, color=aqua, lw=2, zorder=3, label=t("兩道都開（輸入 + 輸出守門）", "Input + output guard"))
+    ax.plot(sx, sy, color=aqua, lw=2, zorder=3, label="Input + output guard")
 
     # ---- 門檻 τ 的記號：兩條線都畫點，第一道那條標字 ----
     marked = [pt for pt in pts if pt["tau"] in TRADEOFF_MARKS]

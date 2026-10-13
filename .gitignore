@@ -14,3 +14,6 @@ deep20_guard_report/tradeoff*.png
 
 # LiveCodeBench 的題目檔，129MB，超過 GitHub 單檔 100MB 上限
 test6.jsonl
+
+# deep20_coding_report.py 的 Excel，每次跑都會重生
+deep20_coding_report/tables*.xlsx
