@@ -88,7 +88,7 @@ TPR@FPR=x% 是這條線上的一個點，AUROC 是這條線下的面積；Precis
     tradeoff.png       放大 τ 0.40–1.00，標 0.4 / 0.5 / … / 1.0 和 0.85（permissive）
                        τ = 1.0 是「m ≥ τ」那條路關掉、只剩 severity 升級在擋的底線（藍線最左下）
     tradeoff_full.png  全範圍 τ 0–1.00，兩軸都是 0–100%，每 0.1 標一個；τ = 0 全擋（右上角），
-                       灰框是 tradeoff.png 放大的範圍。τ < 0.35（review 門檻）時沒有 review 這一段
+                       τ < 0.35（review 門檻）時沒有 review 這一段
 
 τ 越低越嚴：點往右上走，擋下更多有害、也誤擋更多正常。
 綠線只畫到目前的門檻：比它鬆的 τ，原本在第一道擋下的題目沒有模型回覆，不知道第二道會不會擋，
@@ -1289,16 +1289,14 @@ def report_tradeoff(rep, pts, macro, variant=TRADEOFF_VARIANTS[0], t2=None, k=0.
              "門檻變動造成 review 改變的題目，回覆會有一點偏差")
 
 
-def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t2=None,
-                 zoom_name="tradeoff.png"):
+def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t2=None):
     """Recall（Y）vs FPR（X），兩條曲線：只開第一道、兩道都開。點上標門檻 τ。
 
     full=False：放大 τ ≥ ZOOM_MIN 的區段（tradeoff.png），軸只畫到資料範圍。
-    full=True ：τ 0–1.00 全範圍（tradeoff_full.png），兩軸都是 0–100%，並框出放大圖的範圍。
+    full=True ：τ 0–1.00 全範圍（tradeoff_full.png），兩軸都是 0–100%。
     線每 0.01 一點；圓點和數字只標 MARKS_ZOOM / MARKS_FULL，彼此太近的數字會省略（圓點照畫）。
     """
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
 
     import deep20_report as d20r  # 調色盤、字型、坐標軸樣式和 deep20_report 的圖一致
 
@@ -1335,13 +1333,12 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
                   color=c["ink2"])
 
     # ---- 門檻 τ 的記號：兩條線都畫點，第一道那條標數字 ----
+    # 點不加白色外圈：外圈會把線遮掉一小段，看起來像斷線
     marked = [pt for pt in shown if any(abs(pt["tau"] - m) < 1e-9 for m in marks)]
     for pt in marked:
-        ax.plot(pt["g1_fpr"][0], pt["g1_rec"][0], "o", ms=8, color=blue,
-                mec=c["surface"], mew=2, zorder=5)
+        ax.plot(pt["g1_fpr"][0], pt["g1_rec"][0], "o", ms=7, color=blue, mew=0, zorder=5)
         if pt["exact"]:
-            ax.plot(pt["sys_fpr"][0], pt["sys_rec"][0], "o", ms=8, color=aqua,
-                    mec=c["surface"], mew=2, zorder=5)
+            ax.plot(pt["sys_fpr"][0], pt["sys_rec"][0], "o", ms=7, color=aqua, mew=0, zorder=5)
     # 數字：兩端與目前門檻優先，其餘照順序；和已標的數字距離不到 20 px 就省略，免得疊字
     actual = POLICIES[GUARD_POLICY]["action_threshold"]
     order = sorted(marked, key=lambda pt: (pt is not marked[0] and pt is not marked[-1],
@@ -1358,19 +1355,6 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
                     (pt["g1_fpr"][0], pt["g1_rec"][0]), textcoords="offset points",
                     xytext=(-7 if near_right else 7, -12), ha="right" if near_right else "left",
                     color=c["ink2"], fontsize=8)
-
-    if full:  # 框出放大圖（tradeoff.png）的範圍
-        zoom = [pt for pt in pts if pt["tau"] >= ZOOM_MIN - 1e-9]
-        zx = [pt["g1_fpr"][0] for pt in zoom] + [pt["sys_fpr"][0] for pt in zoom if pt["exact"]]
-        zy = [pt["g1_rec"][0] for pt in zoom] + [pt["sys_rec"][0] for pt in zoom if pt["exact"]]
-        x0, x1, y0, y1 = min(zx), max(zx), min(zy), max(zy)
-        pad = 0.012
-        ax.add_patch(Rectangle((x0 - pad, y0 - pad), x1 - x0 + 2 * pad, y1 - y0 + 2 * pad,
-                               fill=False, edgecolor=c["muted"], lw=0.9, zorder=2))
-        # 曲線都往左上走，框的右下角外面一定是空的：說明放那裡，檔名再長也不會壓到線
-        ax.annotate(f"zoomed in {zoom_name}\n(τ {ZOOM_MIN:.2f}–1.00)", (x1 + pad, y0 - pad),
-                    textcoords="offset points", xytext=(5, 0), ha="left", va="bottom",
-                    color=c["muted"], fontsize=7.5)
 
     if caption:  # 八張圖長得很像，左上角寫明是哪一種組合
         ax.set_title(caption, loc="left", color=c["ink2"], fontsize=9, pad=8)
@@ -1769,7 +1753,7 @@ def cmd_report(args):
                     fig_tradeoff(pts, os.path.join(args.out, name), dark=args.dark,
                                  macro=args.tradeoff_macro, full=full,
                                  caption=variant_text(v, "en", t2, k),
-                                 t2=t2 if v["t2_fixed"] else None, zoom_name="tradeoff" + tail)
+                                 t2=t2 if v["t2_fixed"] else None)
         except ImportError as e:
             print(f"  [skip] 畫不了圖（{e}）；需要 numpy + matplotlib")
     if not args.no_excel:
