@@ -93,7 +93,7 @@ TPR@FPR=x% 是這條線上的一個點，AUROC 是這條線下的面積；Precis
 
     每張圖另有一份只畫綠線（Input + output guard）的，檔名在 tradeoff / tradeoff_full 後面加 _green：
     tradeoff_green.png、tradeoff_full_green.png、tradeoff_green_t2fix.png……共 8 張。
-    數字改標在綠點上，軸只依綠線的範圍畫。τ ≤ 目前的門檻是確切值（實線）；比它鬆的那段畫估計值（虛線）：
+    數字改標在綠點上，軸只依綠線的範圍畫。τ ≤ 目前的門檻是確切值，比它鬆的那段接著畫估計值（同一條實線，圖例註明）：
     沒有回覆的題目，假設放行後和「同一個資料集、同樣該擋／免擋、通過第一道的題目裡第一道分數最高的
     30 題」一樣比例被第二道擋下。估計值的數字在 [G10] 每張表下面那張「估計值」表，
     一定落在範圍裡；只是估計，要確切值還是得用較鬆的門檻重跑。
@@ -142,7 +142,7 @@ TPR@FPR=x% 是這條線上的一個點，AUROC 是這條線下的面積；Precis
     deep20_guard_report/tradeoff_full.png  同上，全範圍 τ 0–1.00
                                         另外三種組合同樣各兩張，檔名多 _rs / _t2fix / _t2fix_rs
     deep20_guard_report/tradeoff_green*.png, tradeoff_full_green*.png
-                                        上面 8 張各一份只畫綠線（兩道都開）的，τ 比目前門檻鬆的那段畫估計值（虛線）
+                                        上面 8 張各一份只畫綠線（兩道都開）的，τ 比目前門檻鬆的那段畫估計值
     dataset_guardrail.xlsx              dataset.xlsx 的副本，最後面多八欄：題數、第一道擋、第二道擋、
                                         模型自拒、ASR、FPR、空回覆、正常回答（[G6] 逐資料集的數字），
                                         每格寫成「73.75%」換行「(59/80)」；FPR = 第一道擋 + 第二道擋。
@@ -1142,7 +1142,7 @@ ZOOM_MIN = 0.40
 MARKS_ZOOM = (0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 1.0)
 MARKS_FULL = tuple(round(0.1 * i, 1) for i in range(11))
 TRADEOFF_MARKS = tuple(sorted(set(MARKS_ZOOM) | set(MARKS_FULL)))  # [G10] 表格列出的門檻
-# 估計值（只畫綠線的圖用虛線畫）：門檻比實際跑的鬆時，原本在第一道擋下的題目沒有回覆，
+# 估計值（只畫綠線的圖，τ 比實際門檻鬆的那段）：門檻比實際跑的鬆時，原本在第一道擋下的題目沒有回覆，
 # 就假設它們放行後的結局和「最像它們、而且有回覆」的題目一樣——同一個資料集、同樣該擋／免擋、
 # 實際跑時通過第一道的題目裡，第一道分數 m 最高的 ESTIMATE_K 題（被擋下的題目 m 都比較高，這些最接近）。
 # 那一組通過第一道的題目不到 ESTIMATE_MIN 題，就改用所有資料集同樣該擋／免擋的題目。
@@ -1338,7 +1338,7 @@ def report_tradeoff(rep, pts, macro, variant=TRADEOFF_VARIANTS[0], t2=None, k=0.
                  for n in ("rec", "fpr", "asr")]
         est_body.append([f"{pt['tau']:.2f}"] + cells + [pt["sys_unk"]])
     if est_body:
-        rep.table(f"G10_{variant['key']}", "估計值：門檻比實際跑的鬆的那幾列（只畫綠線的圖用虛線畫）",
+        rep.table(f"G10_{variant['key']}", "估計值：門檻比實際跑的鬆的那幾列（只畫綠線的圖畫的是這些數字）",
                   ["門檻 τ", "兩道擋下率（估計）", "兩道誤擋率（估計）", "兩道 ASR（估計）", "沒有回覆、用估計的題數"],
                   est_body, ["<", ">", ">", ">", ">"])
     if variant["t2_fixed"]:
@@ -1358,7 +1358,7 @@ def report_tradeoff(rep, pts, macro, variant=TRADEOFF_VARIANTS[0], t2=None, k=0.
              "  要整條曲線都是確切值：把 deep20.py 的門檻調到你考慮的最鬆值重跑一次，更嚴的門檻都能從那份 result 精確重播\n"
              "重播時 review 是照新門檻判的，但回覆是照實際跑時的動作生成的（有沒有附保守回答提示），"
              "門檻變動造成 review 改變的題目，回覆會有一點偏差")
-    rep.note("估計值（只畫綠線的圖，τ 比實際跑的鬆那段的虛線）：沒有回覆的題目，假設放行後的結局和「最像它的已回覆題目」一樣——\n"
+    rep.note("估計值（只畫綠線的圖，τ 比實際跑的鬆那一段）：沒有回覆的題目，假設放行後的結局和「最像它的已回覆題目」一樣——\n"
              f"  同一個資料集、同樣該擋／免擋、實際跑時通過第一道的題目裡，第一道分數最高的 {ESTIMATE_K} 題，"
              "看它們在這組門檻下被第二道擋下（或漏出）的比例；\n"
              f"  那一組通過第一道的題目不到 {ESTIMATE_MIN} 題時，改用所有資料集同樣該擋／免擋的題目\n"
@@ -1372,7 +1372,7 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
     full=False：放大 τ ≥ ZOOM_MIN 的區段（tradeoff.png），軸只畫到資料範圍。
     full=True ：τ 0–1.00 全範圍（tradeoff_full.png），兩軸都是 0–100%。
     green_only=True：只畫兩道都開那條（*_green.png），數字標在綠點上，放大圖的軸只依綠線的範圍；
-                     確切值畫實線，門檻比實際跑的鬆的那段畫估計值（虛線，見 ESTIMATE_K）。
+                     門檻比實際跑的鬆的那段接著畫估計值（同一條實線，圖例註明，見 ESTIMATE_K）。
     線每 0.01 一點；圓點和數字只標 MARKS_ZOOM / MARKS_FULL，彼此太近的數字會省略（圓點照畫）。
     回傳是否有畫：green_only 時範圍內沒有綠點就不畫。
     """
@@ -1399,18 +1399,13 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
     ys = [] if green_only else [pt["g1_rec"][0] for pt in shown]
     if not green_only:
         ax.plot(xs, ys, color=blue, lw=2, zorder=3, label="Input guard only")
-    # ---- 兩道都開：確切值（門檻不比實際跑的鬆）畫實線；更鬆的門檻是範圍，兩條線的圖不畫、看 [G10] 的表，
-    #      只畫綠線的圖畫估計值（虛線） ----
-    sys_name = "Input + output guard" + (f" (output fixed at {t2:.2f})" if t2 is not None else "")
-    sx = [pt["sys_fpr"][0] for pt in ex]
-    sy = [pt["sys_rec"][0] for pt in ex]
-    ax.plot(sx, sy, color=aqua, lw=2, zorder=3, label=sys_name + (", measured" if guess else ""))
-    gx = [pt["sys_fpr_est"] for pt in ex[-1:] + guess] if guess else []
-    gy = [pt["sys_rec_est"] for pt in ex[-1:] + guess] if guess else []
-    if guess:
-        ax.plot(gx, gy, color=aqua, lw=2, ls=(0, (4, 2.5)), zorder=3,
-                label=sys_name + f", estimated (τ > {actual:.2f})")
-    sx, sy = sx + gx, sy + gy
+    # ---- 兩道都開：確切值（門檻不比實際跑的鬆）；更鬆的門檻是範圍，兩條線的圖不畫、看 [G10] 的表，
+    #      只畫綠線的圖接著畫估計值，同一條實線，圖例註明哪段是估計 ----
+    sx = [pt["sys_fpr"][0] for pt in ex] + [pt["sys_fpr_est"] for pt in guess]
+    sy = [pt["sys_rec"][0] for pt in ex] + [pt["sys_rec_est"] for pt in guess]
+    ax.plot(sx, sy, color=aqua, lw=2, zorder=3,
+            label="Input + output guard" + (f" (output fixed at {t2:.2f})" if t2 is not None else "")
+            + (f", estimated for τ > {actual:.2f}" if guess else ""))
 
     # ---- 軸：要先定好，下面才算得出每個數字在圖上的位置 ----
     if full:
@@ -1456,7 +1451,7 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
 
     if caption:  # 十六張圖長得很像，左上角寫明是哪一種組合
         ax.set_title(caption, loc="left", color=c["ink2"], fontsize=9, pad=8)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=1 if green_only and not guess else 2,
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=1 if green_only else 2,
               labelcolor=c["ink2"], fontsize=8.5)
     d20r._save(fig, path, c)
     return True
