@@ -17,3 +17,7 @@ test6.jsonl
 
 # deep20_coding_report.py 的 Excel，每次跑都會重生
 deep20_coding_report/tables*.xlsx
+
+# hierarchical_cpc.py 下載的 CPC zip（10 MB）和 jevk5 回答的快取，每次跑都能重生
+hierarchical_cpc/datasets/
+hierarchical_cpc/json_cache.*
