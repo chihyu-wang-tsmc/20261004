@@ -12,8 +12,11 @@
 公式和 deep20_report.py 的 Data.curve() 相同，只是題數少到每一階都看得見。
 資料是虛構的（題數、對錯、花費都是），只用來說明畫法。
 
-    python deep20_curve_howto.py            # → deep20_curve_howto.png
-    python deep20_curve_howto.py --dark     # → deep20_curve_howto_dark.png
+    python deep20_curve_howto.py            # → deep20_curve_howto.png / .svg
+    python deep20_curve_howto.py --dark     # → deep20_curve_howto_dark.png / .svg
+
+SVG 的文字轉成外框（matplotlib 預設的 svg.fonttype = "path"）：對方電腦沒裝中文字型也長得一樣，
+代價是文字不能直接在 SVG 裡改，要改就改本檔再重畫。
 """
 
 import argparse
@@ -218,9 +221,10 @@ def main():
     args = ap.parse_args()
     setup_font()
     c = PALETTE["dark" if args.dark else "light"]
-    path = os.path.join(args.out, f"deep20_curve_howto{'_dark' if args.dark else ''}.png")
-    draw(build(), c, path)
-    print(f"→ {os.path.relpath(path, HERE)}")
+    for ext in ("png", "svg"):
+        path = os.path.join(args.out, f"deep20_curve_howto{'_dark' if args.dark else ''}.{ext}")
+        draw(build(), c, path)
+        print(f"→ {os.path.relpath(path, HERE)}")
 
 
 if __name__ == "__main__":
