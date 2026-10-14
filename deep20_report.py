@@ -53,6 +53,7 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/fig1_main_tau_curve.png   同上，門檻 τ 的記號標在曲線上（做法 A）
     deep20_report/fig1_main_tau_axis.png    同上，門檻 τ 當上方第二條 X 軸（做法 B）
     deep20_report/fig1_main_tau_axis_conf.png  同上，上方同時標 τ 與 route_conf（做法 C2）
+    deep20_report/fig1_main_tau_axis_<bench>.png   做法 B 的四個 bench 各一張（gpqa / ai2arc / aime / gsm8k）
     deep20_report/fig2_per_bench.png  正文圖 2：四個 bench 分開看
     deep20_report/fig2_per_bench_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
     deep20_report/fig2_per_bench_zoom.png   同上，Y 軸每格各自從藍線附近開始（跨距各格不同）
@@ -810,11 +811,14 @@ def draw_tau_axis(ax, a, c, fontsize=8, label=False, conf=False):
     return axt
 
 
-def fig1_main(a, c, path, band=False, random=False, tau=None):
+def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     """正文圖 1：成本–品質曲線。X 軸同一個量（成本）標兩套刻度：呼叫比例 + $／千題。
 
     band / random 預設關掉（--with-band / --with-random 打開）。注意關掉的只是「畫不畫」：
     random 這條線仍然在算，APGR 就是以它為分母，數字照樣出現在表 1 與 Excel。
+
+    a 也可以是單一 bench 的 analyse() 結果（欄位相同），就是 fig1_main_tau_axis_<bench>。
+    title 只給這種單一 bench 的版本用：四張長得很像，沒標名字分不出來；合計那張照舊不畫標題。
     """
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8.4, 5.4))
@@ -840,7 +844,8 @@ def fig1_main(a, c, path, band=False, random=False, tau=None):
     # 這些數字沒有消失，它們在主控台報表的表 1 和 tables.xlsx 裡。
     ax.set_xlim(-0.02, 1.02)
     lo = min(a["acc_fast"], r["acc"].min()) - 0.03
-    hi = a["ceiling"] + 0.02
+    # 上限不超過 100%（正確率不會超過）；天花板剛好是 100% 時留一點邊，線才不會貼在框上
+    hi = min(a["ceiling"] + 0.02, max(1.0, a["ceiling"] + 0.005))
     ax.set_ylim(lo, hi)
     pct_axis(ax.yaxis)
 
@@ -860,6 +865,9 @@ def fig1_main(a, c, path, band=False, random=False, tau=None):
         ax.set_ylim(lo, hi)
     elif tau in ("axis", "axis-conf"):
         draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
+    if title:  # 上方有 τ 刻度時要讓開它（axis-conf 還多一行刻度和軸標題）
+        ax.set_title(title, color=c["ink"], fontsize=11, loc="left",
+                     pad={"axis": 22, "axis-conf": 48}.get(tau, 8))
 
     # 圖例放在繪圖區外（下方），不壓到資料
     n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
@@ -1538,6 +1546,10 @@ def cmd_report(args):
         stem = variant.replace("-", "_")
         fig1_main(a, c, os.path.join(args.out, f"fig1_main_tau_{stem}{sfx}.png"),
                   tau=variant, **kw)
+        if variant == "axis":  # 四個 bench 各一張，版面和合計那張相同
+            for name, b in per_bench.items():
+                fig1_main(b, c, os.path.join(args.out, f"fig1_main_tau_axis_{name}{sfx}.png"),
+                          tau=variant, title=f"{name.upper()}　n = {b['n']}", **kw)
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
         # 曲線上的 τ 記號畫的是原始正確率，所以 norm 版只出 axis
         if variant != "axis-conf":
