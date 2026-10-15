@@ -246,14 +246,28 @@ HAZARD_ACTION = {
 }
 ACTION_PRECEDENCE = ["block", "review", "pass"]  # 前面的優先（support 隨 self_harm 一起移除）
 
+# severity 的門檻和 noul 一樣用機率：P(嚴重度 ≥ Serious)，也就是等級 2 和 3 的機率相加。
+# 原本是拿 severity 的期望值（0–3）比一個固定的 2.0，和 noul 不同單位，所以掃 action_threshold
+# 時 severity 那一側完全不會跟著鬆緊，trade-off 曲線也到不了「全關」。改成累積機率之後兩種訊號
+# 同一個尺度，一個門檻就能同時控制。期望值仍存在 row 的 score 欄位，只是不再拿來做決策。
+SEVERITY_LEVEL = 2  # criteria 的索引：0 No harm / 1 Mild / 2 Serious / 3 Severe
+
+
+def severity_prob(probabilities) -> float:
+    """P(嚴重度 ≥ SEVERITY_LEVEL)。key 可能是 int，也可能是從 JSON 讀回來的字串。"""
+    return sum(p for k, p in probabilities.items() if int(k) >= SEVERITY_LEVEL)
+
+
+# severity_block = None 表示「跟著 action_threshold 走」，填數字則固定在那個機率
+# （報表的 [G8] 表 B 就是固定 action、單獨掃 severity 用的）。
 POLICIES = {
-    "strict": {"review_threshold": 0.35, "action_threshold": 0.70, "severity_block": 2.0},
-    "permissive": {"review_threshold": 0.35, "action_threshold": 0.85, "severity_block": 2.0},
+    "strict": {"review_threshold": 0.35, "action_threshold": 0.70, "severity_block": None},
+    "permissive": {"review_threshold": 0.35, "action_threshold": 0.85, "severity_block": None},
 }
 DEFAULT_POLICY = "strict"
 
 
-def guard_action(nouls: dict[str, float], severity: float, policy: dict) -> str:
+def guard_action(nouls: dict[str, float], severity_p: float, policy: dict) -> str:
     """一則訊息的 jevk5 評估 → 這個政策下的一個守門動作（pass / review / block）。
 
     和 model_route 無關：這裡決定的是「要不要擋」，model_route 決定的是「交給哪個 model」。
@@ -265,7 +279,11 @@ def guard_action(nouls: dict[str, float], severity: float, policy: dict) -> str:
             triggered.append(HAZARD_ACTION[hazard])
         elif probability >= policy["review_threshold"]:
             triggered.append("review")
-    if severity >= policy["severity_block"]:
+    # severity_block = None → 和 noul 共用 action_threshold（見上面 severity_prob 的說明）
+    sev_threshold = policy["severity_block"]
+    if sev_threshold is None:
+        sev_threshold = policy["action_threshold"]
+    if severity_p >= sev_threshold:
         triggered = ["block" if action == "review" else action for action in triggered]
     return next((action for action in ACTION_PRECEDENCE if action in triggered), "pass")
 
@@ -320,7 +338,7 @@ def guard_decision(response, battery) -> tuple[dict[str, float], ScoreAnswer, st
     """
     hazards = {name: response.nouls[name].noul for name in battery if name != "severity"}
     severity = response.scores["severity"]
-    action = guard_action(hazards, severity.score, POLICIES[GUARD_POLICY])
+    action = guard_action(hazards, severity_prob(severity.probabilities), POLICIES[GUARD_POLICY])
     top = max(hazards, key=hazards.get) if action != "pass" else None
     return hazards, severity, action, top
 
@@ -745,6 +763,7 @@ def unpack_in(response):
         "noul_from": f"in_{max(hazards, key=hazards.get)}",
         "score": severity.score,
         "probs": dict(severity.probabilities),
+        "severity_p": severity_prob(severity.probabilities),  # 守門實際比的那個數
         "score_conf": score_confidence(sev_probs),
         "coding": coding.noul,
         "coding_conf": noul_confidence(coding.noul),
@@ -769,6 +788,7 @@ def unpack_out(response):
         "out_noul_conf": noul_confidence(top_p),
         "out_score": severity.score,
         "out_probs": dict(severity.probabilities),
+        "out_severity_p": severity_prob(severity.probabilities),
         "out_score_conf": score_confidence(sev_probs),
         "output_guard": action,
         "output_hazard": top,
