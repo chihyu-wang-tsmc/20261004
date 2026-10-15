@@ -157,7 +157,7 @@ from typing import Callable
 
 import pyarrow.parquet as pq
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_typesafe import Choice, Noul, NoulCriteria, Score
+from langchain_typesafe import Choice, Noul, NoulCriteria, Score, ScoreAnswer
 
 from classifier_jevk5 import JevK5Classifier, choice_confidence, noul_confidence, score_confidence
 from llm_models import qwen

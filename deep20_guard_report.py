@@ -171,6 +171,8 @@ from datetime import datetime
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULT_DIR = os.path.join(HERE, "deep20_results")
 OUT_DIR = os.path.join(HERE, "deep20_guard_report")
+# 兩道守門是誰問的，只影響報表上的字（deep20_guard_report_h2o.py 會覆寫成 h2o-lightning）
+GUARD_NAME = "jevk5"
 
 SCHEMA = 2  # 和 deep20.py 的 SCHEMA 一致
 CATEGORIES = ("safety", "jailbreak", "injection", "cyber", "coding", "skill", "fast-powerful")
@@ -755,9 +757,9 @@ def report_matrix(rep, rows):
          cat_cell("s1", "micro"), cat_cell("s2", "micro"),
          "四格加總再算；類別互斥，所以等於全體 F1"],
         row("ECE", "ece", lambda x: F(x, 4), "noul / out_noul 當 P(unsafe)，10 箱"),
-        ["Latency／成本", Cell(1.0, "1 次 jevk5"), Cell(called_frac, f"+{called_frac:.2f} 次 jevk5"),
-         Cell(1.0, f"1 次 jevk5 + {llm_frac:.2f} 次 LLM"),
-         Cell(1 + called_frac, f"{1 + called_frac:.2f} 次 jevk5 + {llm_frac:.2f} 次 LLM"),
+        ["Latency／成本", Cell(1.0, f"1 次 {GUARD_NAME}"), Cell(called_frac, f"+{called_frac:.2f} 次 {GUARD_NAME}"),
+         Cell(1.0, f"1 次 {GUARD_NAME} + {llm_frac:.2f} 次 LLM"),
+         Cell(1 + called_frac, f"{1 + called_frac:.2f} 次 {GUARD_NAME} + {llm_frac:.2f} 次 LLM"),
          "deep20 沒存耗時，用每題的呼叫次數代替；兩道是串行（生成前／生成後），不能合併成一次"],
     ]
     rep.table("M_總表", "", ["指標", "第一道（prompt）", "第二道（response）", "系統：只開第一道",
@@ -961,7 +963,7 @@ def report_system(rep, rows):
                      P(leak / len(H) if H else None), P(unhelpful / len(B) if B else None), F(jevk5, 2)])
     rep.table("G5_系統", "表 C　消融：第二道值不值得", [
         "設定", "Precision", "守門 Recall", "守門 FPR", "F1", "ASR（該擋題放出有害回覆）",
-        "免擋題沒拿到答案", "jevk5 次數/題"], body)
+        "免擋題沒拿到答案", f"{GUARD_NAME} 次數/題"], body)
     rep.note("守門 Recall / FPR 只算兩道守門擋下的；ASR 和「沒拿到答案」把模型自拒也算進去，是使用者實際感受到的\n"
              "沒有「只開第二道」或「都不開」：第一道擋下的題目沒有呼叫模型，沒有回覆可以評")
 
@@ -1024,7 +1026,8 @@ def report_groups(rep, rows):
               body, ["<", "<", ">", ">", ">", ">", ">", ">", "<"])
     rep.table("G6_逐類別", "", ["評估對象", "Macro F1", "Micro F1", "列入 macro 的類別"], summary,
               ["<", ">", ">", "<"])
-    rep.note("和 GuardZoo 的多標籤類別 F1 不同：這裡的類別是資料集來源，不是危害類型（jevk5 沒有逐類別的標準答案）")
+    rep.note("和 GuardZoo 的多標籤類別 F1 不同：這裡的類別是資料集來源，不是危害類型"
+             f"（{GUARD_NAME} 沒有逐類別的標準答案）")
     per_group(rep, rows, "category", "G6_逐類別", "逐類別結局", macro=False)
     per_group(rep, rows, "dataset", "G6_逐資料集", "逐資料集結局", macro=True)
     rep.note("macro 平均 = 每個資料集權重相同；--full 時比整體（micro）更能代表「各類攻擊都顧到」")

@@ -101,6 +101,9 @@ BENCHES = {"GPQA": "gpqa", "AI2ARC": "ai2arc", "AIME": "aime", "GSM8K": "gsm8k"}
 ROUTE_FAST = "deepseek-flash"
 ROUTE_POWERFUL = "gemini-3.7-flash"
 
+# 守門／router 是誰問的，只影響報表和圖例上的字（deep20_report_h2o.py 會覆寫）
+ROUTER_NAME = "jevk5"
+
 # ---- 單價：$ / 百萬 token。**示意值，務必換成實際報價** ----
 PRICES = {
     "fast": {"in": 0.27, "out": 1.10},
@@ -301,7 +304,7 @@ def cmd_prepare(args):
                 "cost_pow": item_cost(p_r.get("input_tokens"), p_r.get("output_tokens"), "powerful"),
             })
         print(f"  {ds_name:<8} 併出 {len(out) - n_before:>4} 題"
-              f"（缺作答 {missing_ans}、缺 jevk5 的 route_p {missing_row}）")
+              f"（缺作答 {missing_ans}、缺 {ROUTER_NAME} 的 route_p {missing_row}）")
 
     for s in skipped:
         print(f"  [skip] {s}")
@@ -515,11 +518,15 @@ def on_grid(curve):
     return np.interp(GRID, curve["call"], curve["acc"])
 
 
+# np.trapezoid 是 NumPy 2.0 改的名字，1.x 只有 np.trapz（兩者同一個函式、同樣的引數）
+_trapz = getattr(np, "trapezoid", None) or np.trapz
+
+
 def apgr(router, oracle, rand):
     """Average Performance Gap Recovered：router 在 random 與 oracle 之間回收了多少。"""
     r, o, d = on_grid(router), on_grid(oracle), rand["acc"]
-    num = np.trapezoid(r - d, GRID)
-    den = np.trapezoid(o - d, GRID)
+    num = _trapz(r - d, GRID)
+    den = _trapz(o - d, GRID)
     return float(num / den) if den > 1e-12 else float("nan")
 
 
@@ -834,7 +841,7 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
         ax.plot(d["call"], d["acc"], color=c["muted"], lw=1.4, ls=(0, (5, 4)),
                 label="Random router")
     ax.plot(r["call"], r["acc"], color=c["router"], lw=2.2,
-            label=t("jevk5 model_route", "jevk5 model_route"))
+            label=t(f"{ROUTER_NAME} model_route", f"{ROUTER_NAME} model_route"))
 
     ax.plot([0], [a["acc_fast"]], "o", ms=8, color=c["ink"], zorder=5,
             markeredgecolor=c["surface"], markeredgewidth=2)
@@ -976,7 +983,7 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fi
             axt.tick_params(axis="x", colors=c["muted"], labelcolor=c["ink2"],
                             labelsize=7, length=3)
     handles = [
-        plt.Line2D([], [], color=c["router"], lw=2.0, label="jevk5 model_route"),
+        plt.Line2D([], [], color=c["router"], lw=2.0, label=f"{ROUTER_NAME} model_route"),
         plt.Line2D([], [], color=c["oracle"], lw=1.3, label="Oracle (upper bound)"),
     ]
     if random:
