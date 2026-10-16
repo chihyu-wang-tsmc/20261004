@@ -26,6 +26,12 @@ GUARD_NAME 只影響報表上的字，不影響任何數字。沒有它的話，
     python deep20_guard_report_h2o.py report --no-excel --no-plot
     python deep20_guard_report_h2o.py report --cn            # 中文版 result
 
+    # 用 measure 跑出來的 result（deep20_h2o.py run --guard-policy measure）：
+    # --guard-policy measure 告訴報表 result 是怎麼跑的，--as-policy strict 讓 [M] [G1]–[G7] 和
+    # dataset_guardrail*.xlsx 改成 strict（0.70）的結果；[G8] [G10] 的門檻掃描 0–1 都是確切值
+    python deep20_guard_report_h2o.py report --guard-policy measure --as-policy strict \
+        --dataset-out deep20_guard_report_h2o/dataset_guardrail.xlsx
+
 要同時比 jevk5 和 h2o，就兩支各跑一次，輸出在不同目錄，不會互相覆蓋：
 
     python deep20_guard_report.py     report    # deep20_results/      → deep20_guard_report/

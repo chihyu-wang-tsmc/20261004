@@ -132,8 +132,17 @@ TPR@FPR=x% 是這條線上的一個點，AUROC 是這條線下的面積；Precis
     python deep20_guard_report.py report --dark             # trade-off 圖用深色版
     python deep20_guard_report.py report --tradeoff-t2 0.85 --tradeoff-review-scale 0.4   # 換組合的參數
     python deep20_guard_report.py report --no-dataset-xlsx  # 不產生 dataset_guardrail.xlsx
+    python deep20_guard_report.py report --as-policy strict # 報表改用 strict 呈現（result 要用一樣鬆或更鬆的政策跑）
     python deep20_guard_report.py label                     # 匯出人工標註用的 labels.csv（每個資料集抽 20 題）
     python deep20_guard_report.py label --per-dataset 50    # 每個資料集抽 50 題
+
+--as-policy：result 用比較鬆的政策跑（例如 h2o 的 measure，第一道幾乎不擋）時，每題都有模型回覆，
+任何更嚴的政策都能精確重播。加 --as-policy strict 之後：
+    [M] [G1]–[G7]、逐題資料、dataset_guardrail*.xlsx   重播成 strict 的結果（沒加時是實際跑的 measure）
+    [G8] [G10]                                          照常用全部的 result，τ 0–1 都是確切值；
+                                                        「← 目前」改標 strict，第二道固定的組合預設 T2 = 0.70
+    [G0]                                                一致性檢查仍然對 result 實際跑的政策
+政策只能往嚴的方向換：實際跑時在第一道擋下、新政策卻會放行的題目沒有回覆，報表會直接停下來說明。
 
 ---- 產出 ----
 
@@ -204,7 +213,15 @@ POLICIES = {
     "strict": {"review_threshold": 0.35, "action_threshold": 0.70, "severity_block": None},
     "permissive": {"review_threshold": 0.35, "action_threshold": 0.85, "severity_block": None},
 }
-GUARD_POLICY = "strict"  # deep20.py 的 GUARD_POLICY（= DEFAULT_POLICY）
+GUARD_POLICY = "strict"  # deep20.py 的 GUARD_POLICY（= DEFAULT_POLICY）：result 是用哪組門檻跑的
+# 報表要呈現的政策（report --as-policy）；None = 和 GUARD_POLICY 相同。result 用比較鬆的政策跑時
+# （例如 h2o 的 measure），可以精確重播成任何更嚴的政策，見 as_policy_view()
+AS_POLICY = None
+
+
+def report_policy():
+    """報表當成「目前」的那組政策：有 --as-policy 就是它，沒有就是實際跑的 GUARD_POLICY。"""
+    return POLICIES[AS_POLICY or GUARD_POLICY]
 
 IN_HAZARDS = ("jailbreak", "harmful_request")       # INPUT_BATTERY 去掉 severity
 OUT_HAZARDS = ("broke_policy", "harmful_request")   # OUTPUT_BATTERY 去掉 severity
@@ -377,6 +394,43 @@ def derive(rows, labels):
                                     "refused" if r["refused"] else "answered")
         else:
             r["outcome_g1_only"] = r["outcome"]
+
+
+def as_policy_view(rows, name):
+    """用 GUARD_POLICY 跑出來的 rows → 「當初用 name 這組政策跑」會得到的 rows（另一份複本，derive 之前用）。
+
+    只能往嚴的方向重播：新政策在第一道擋下的題目，回覆和第二道的判斷一律丟掉（和 deep20 輸入端
+    擋下的題目長得一樣）；新政策放行、有回覆的題目，第二道用新政策重判。實際跑時在第一道擋下、
+    新政策卻會放行的題目沒有回覆，重播不出來，直接停下來。
+    回覆是照實際跑時的動作生成的：review 狀態改變的題目（有沒有附保守回答提示）會有一點偏差。
+    """
+    pol = POLICIES[name]
+    view, lost = [], Counter()
+    for r in rows:
+        v = dict(r)
+        g1 = in_action(r, pol)
+        if r["guard"] == "block" and g1 != "block":
+            lost[r["dataset"]] += 1
+        v["guard"] = g1
+        v["guard_hazard"] = None if g1 == "pass" else max(IN_HAZARDS, key=lambda h: r[f"in_{h}"])
+        if g1 == "block":
+            for k in [k for k in v if k.startswith("out_")]:
+                del v[k]
+            v.update(called_model=False, model=None, reply="", output_guard=None, output_hazard=None,
+                     blocked_at="input", out_severity_p=0.0)
+        elif r.get("output_guard") is not None:
+            g2 = out_action(r, pol)
+            v["output_guard"] = g2
+            v["output_hazard"] = None if g2 == "pass" else max(OUT_HAZARDS, key=lambda h: r[f"out_{h}"])
+            v["blocked_at"] = "output" if g2 == "block" else None
+        view.append(v)
+    if lost:
+        where = "、".join(f"{d} {n} 題" for d, n in sorted(lost.items()))
+        raise SystemExit(f"--as-policy {name} 比 result 實際跑的政策（{GUARD_POLICY}）鬆：{sum(lost.values())} 題"
+                         f"實際跑時在第一道擋下、沒有模型回覆，重播不出來（{where}）。\n"
+                         f"要 {name} 的數字，得用和它一樣鬆或更鬆的政策重跑這些資料集"
+                         "（h2o 版：python deep20_h2o.py run --guard-policy measure --refresh）")
+    return view
 
 
 # ============================================================================
@@ -603,7 +657,8 @@ def report_overview(rep, rows, metas, args):
     print(f"  deep20 兩道守門報表　{'示意資料' if args.mock else '真實資料'}"
           f"　{'中文版' if args.cn else '英文版'}{'　isolate' if args.isolate else ''}")
     print(f"  {len({r['dataset'] for r in rows})} 個資料集、{len(rows)} 題"
-          f"（該擋 {len(H)}／免擋 {len(B)}）　守門政策 {GUARD_POLICY} {POLICIES[GUARD_POLICY]}")
+          f"（該擋 {len(H)}／免擋 {len(B)}）　守門政策 {GUARD_POLICY} {POLICIES[GUARD_POLICY]}"
+          + (f"　報表政策 {AS_POLICY} {POLICIES[AS_POLICY]}" if AS_POLICY and AS_POLICY != GUARD_POLICY else ""))
     print(f"{'=' * 78}")
 
     rep.section("[G0] 讀數字之前")
@@ -620,6 +675,11 @@ def report_overview(rep, rows, metas, args):
     tag = "" if same1 > 0.999 and same2 > 0.999 else \
         "　⚠ 對不上：deep20.py 的 GUARD_POLICY / POLICIES 改過了，請同步本檔的常數，否則 [G8] 不準"
     rep.note(f"重播 {GUARD_POLICY} 與 result 的動作一致率：第一道 {same1:.1%}　第二道 {same2:.1%}{tag}")
+    if AS_POLICY and AS_POLICY != GUARD_POLICY:
+        rep.note(f"--as-policy {AS_POLICY}：result 是用 {GUARD_POLICY} 跑的，[M] [G1]–[G7] 和兩個 dataset_guardrail xlsx "
+                 f"改成重播 {AS_POLICY}（{POLICIES[AS_POLICY]}）的結果；\n"
+                 f"  [G8] [G9] [G10] 照常用全部的 result，[G8] [G10] 的「目前」改標 {AS_POLICY}。"
+                 "回覆是照實際跑時的動作生成的，review 狀態改變的題目會有一點偏差")
     rep.note(f"第二道的標準答案（回覆是否有害）：人工 {n_human} 題，其餘 {len(rows) - n_human} 題用啟發式"
              f"（見檔頭；拒答只看回覆前 {REFUSAL_HEAD} 字，deep20 只存了前 400 字）")
     if not n_human:
@@ -1107,7 +1167,17 @@ REPLAY_GRID = (0.50, 0.60, 0.70, 0.80, 0.85, 0.90, 0.95)
 def report_replay(rep, rows):
     rep.section("[G8] 政策重播：離線換門檻重算 guard_action()，不用重跑 LLM")
     H, B = split(rows)
-    actual = POLICIES[GUARD_POLICY]
+    run = POLICIES[GUARD_POLICY]
+    actual = report_policy()  # 掃描時固定不動的 review / severity 取自報表政策
+    cur = "← 實際跑的" if actual is run else f"← --as-policy {AS_POLICY}"
+
+    def mark_for(t):
+        tags = ["← 實際跑的"] if abs(t - run["action_threshold"]) < 1e-9 else []
+        if actual is not run and abs(t - actual["action_threshold"]) < 1e-9:
+            tags.append(cur)
+        if not tags and abs(t - POLICIES["permissive"]["action_threshold"]) < 1e-9:
+            tags.append("permissive")
+        return "　".join(tags)
 
     def row_for(label, p1, p2, mark=""):
         o = replay(rows, p1, p2)
@@ -1127,9 +1197,7 @@ def report_replay(rep, rows):
     body = []
     for t in REPLAY_GRID:
         p = {**actual, "action_threshold": t}
-        mark = "← 實際跑的" if abs(t - actual["action_threshold"]) < 1e-9 else ""
-        mark = mark or ("permissive" if abs(t - POLICIES["permissive"]["action_threshold"]) < 1e-9 else "")
-        body.append(row_for(f"兩道 action≥{t:.2f}", p, p, mark))
+        body.append(row_for(f"兩道 action≥{t:.2f}", p, p, mark_for(t)))
     for t in REPLAY_GRID:
         p = {**actual, "action_threshold": t}
         body.append(row_for(f"只第一道 action≥{t:.2f}", p, None))
@@ -1147,7 +1215,7 @@ def report_replay(rep, rows):
         p = {**actual, "severity_block": sb}
         label = ("兩道 severity 跟著 action" if sb is None else
                  f"兩道 severity_block {'關' if sb == math.inf else f'{sb:.2f}'}")
-        body.append(row_for(label, p, p, "← 實際跑的" if sb == actual["severity_block"] else ""))
+        body.append(row_for(label, p, p, cur if sb == actual["severity_block"] else ""))
     rep.table("G8_政策重播", f"表 B　掃 severity_block（action {actual['action_threshold']} 固定；"
               "P(嚴重度 ≥ Serious) ≥ 它時 review 升級成 block）",
               ["設定", "守門 Recall", "ASR", "守門 FPR", "未知題數", ""], body,
@@ -1200,7 +1268,7 @@ TRADEOFF_VARIANTS = (
 
 
 def variant_text(v, lang, t2, k):
-    rv = POLICIES[GUARD_POLICY]["review_threshold"]
+    rv = report_policy()["review_threshold"]
     return v[lang].format(t2=t2, k=k, rv=rv)
 
 
@@ -1222,7 +1290,7 @@ def tradeoff(rows, macro=False, t2=None, review_scale=None):
     """
     assert set(HAZARD_ACTION.values()) == {"block"}, \
         "tradeoff() 的快速算法假設每個危害都觸發 block；HAZARD_ACTION 改過的話要改回用 replay()"
-    actual = POLICIES[GUARD_POLICY]
+    actual = report_policy()  # 掃 τ 時固定不動的 review / severity；確不確切看 result 本身（was_blocked）
     rv, sb = actual["review_threshold"], actual["severity_block"]
     size = Counter(r["dataset"] for r in rows)
     groups = {}  # (資料集, 該擋?) → 組號，估計值用
@@ -1335,7 +1403,7 @@ def rng_cell(lohi, per_k=False):
 
 def report_tradeoff(rep, pts, macro, variant=TRADEOFF_VARIANTS[0], t2=None, k=0.5, first=True):
     """[G10] 的一張表；四種組合各印一張，說明只在第一張印。"""
-    actual = POLICIES[GUARD_POLICY]
+    actual = report_policy()  # 「← 目前」標的是報表政策
     t2v = actual["action_threshold"] if t2 is None else t2
     rep.section(f"[G10-{variant['key']}] 門檻 trade-off：{variant_text(variant, 'zh', t2v, k)}"
                 + ("　權重：每個資料集一樣重" if macro else ""))
@@ -1425,7 +1493,9 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
     guess = [pt for pt in shown if not pt["exact"] and pt["sys_rec_est"] is not None] if green_only else []
     if green_only and not ex and not guess:
         return False
-    actual = POLICIES[GUARD_POLICY]["action_threshold"]
+    actual = report_policy()["action_threshold"]  # 數字優先標「目前」那一點
+    # 估計值從哪個 τ 開始：最後一個確切的點（= 實際跑的門檻）
+    bound = max((pt["tau"] for pt in ex), default=POLICIES[GUARD_POLICY]["action_threshold"])
     fig, ax = plt.subplots(figsize=(8.4, 5.8))
     d20r.style_axes(ax, c)
 
@@ -1440,7 +1510,7 @@ def fig_tradeoff(pts, path, dark=False, macro=False, full=False, caption=None, t
     sy = [pt["sys_rec"][0] for pt in ex] + [pt["sys_rec_est"] for pt in guess]
     ax.plot(sx, sy, color=aqua, lw=2, zorder=3,
             label="Input + output guard" + (f" (output fixed at {t2:.2f})" if t2 is not None else "")
-            + (f", estimated for τ > {actual:.2f}" if guess else ""))
+            + (f", estimated for τ > {bound:.2f}" if guess else ""))
 
     # ---- 軸：要先定好，下面才算得出每個數字在圖上的位置 ----
     if full:
@@ -1635,6 +1705,13 @@ def guard_values(name, sub):
     }
 
 
+def policy_note():
+    """xlsx 註腳：數字是哪組政策的結果。"""
+    if AS_POLICY and AS_POLICY != GUARD_POLICY:
+        return f"政策 {AS_POLICY}（result 用 {GUARD_POLICY} 跑，重播成 {AS_POLICY}）"
+    return f"政策 {GUARD_POLICY}"
+
+
 def dataset_xlsx_out(args):
     if args.dataset_out:
         return args.dataset_out
@@ -1694,6 +1771,7 @@ def write_dataset_guardrail(rows, args):
             note += (f"\n\n由 deep20_guard_report.py report 產生（{built}）；"
                      f"{'中文版' if args.cn else '英文版'} result"
                      f"{'、--isolate' if args.isolate else ''}{'、示意資料' if args.mock else ''}；"
+                     f"{policy_note()}；"
                      f"回覆是否有害：人工標籤 {n_human} 題，其餘用拒答關鍵字推斷")
         cell.comment = Comment(note, "deep20_guard_report")
         ws.column_dimensions[get_column_letter(c)].width = 11 if name != "題數" else 8
@@ -1831,7 +1909,7 @@ def write_dataset_3table(rows, args):
     built = datetime.now().isoformat(timespec="seconds")
     ws.cell(r, 1, f"由 deep20_guard_report.py report 產生（{built}）；"
                   f"{'中文版' if args.cn else '英文版'} result{'、--isolate' if args.isolate else ''}"
-                  f"{'、示意資料' if args.mock else ''}。每格是「百分比」換行「(題數/總題數)」；"
+                  f"{'、示意資料' if args.mock else ''}；{policy_note()}。每格是「百分比」換行「(題數/總題數)」；"
                   "每列 N + O + P + Q + S + T = 100%（Q 是「—」時當 0），R = N + O 是小計。").font = \
         Font(name=font, size=10, italic=True)
 
@@ -1848,24 +1926,34 @@ def write_dataset_3table(rows, args):
 # 子命令
 # ============================================================================
 def cmd_report(args):
+    global AS_POLICY
+    if args.as_policy is not None and args.as_policy not in POLICIES:
+        raise SystemExit(f"沒有這個政策：{args.as_policy!r}（可用：{', '.join(POLICIES)}）")
+    AS_POLICY = args.as_policy
     rows, metas = load_rows(args)
     if args.mock:
         metas = [{"full": False, "n": 80}]
     labels = read_labels(labels_path(args))
+    # view：[M] [G1]–[G7]、逐題資料、dataset xlsx 用的那份，有 --as-policy 時重播成那組政策；
+    # rows：[G0] 一致性檢查、[G8] [G9] [G10] 用的原始 result（重播要看實際跑時誰被擋、誰有回覆）
+    view = rows
+    if AS_POLICY and AS_POLICY != GUARD_POLICY:
+        view = as_policy_view(rows, AS_POLICY)
+        derive(view, labels)
     derive(rows, labels)
     rep = Report()
     report_overview(rep, rows, metas, args)
-    report_matrix(rep, rows)
-    report_funnel(rep, rows)
-    report_gate1(rep, rows)
-    report_model(rep, rows)
-    report_gate2(rep, rows)
-    report_system(rep, rows)
-    report_groups(rep, rows)
-    report_adversarial(rep, rows)
+    report_matrix(rep, view)
+    report_funnel(rep, view)
+    report_gate1(rep, view)
+    report_model(rep, view)
+    report_gate2(rep, view)
+    report_system(rep, view)
+    report_groups(rep, view)
+    report_adversarial(rep, view)
     report_replay(rep, rows)
     report_labels(rep, rows)
-    t2 = POLICIES[GUARD_POLICY]["action_threshold"] if args.tradeoff_t2 is None else args.tradeoff_t2
+    t2 = report_policy()["action_threshold"] if args.tradeoff_t2 is None else args.tradeoff_t2
     k = args.tradeoff_review_scale
     curves = []
     for i, v in enumerate(TRADEOFF_VARIANTS):
@@ -1893,11 +1981,11 @@ def cmd_report(args):
     if not args.no_excel:
         os.makedirs(args.out, exist_ok=True)
         print("\n寫 Excel")
-        rep.write_excel(os.path.join(args.out, "tables_mock.xlsx" if args.mock else "tables.xlsx"), rows)
+        rep.write_excel(os.path.join(args.out, "tables_mock.xlsx" if args.mock else "tables.xlsx"), view)
     if not args.no_dataset_xlsx:
         print("\n把 [G6] 逐資料集的數字填進 dataset.xlsx 的副本，另外照三張表排一份")
-        write_dataset_guardrail(rows, args)
-        write_dataset_3table(rows, args)
+        write_dataset_guardrail(view, args)
+        write_dataset_3table(view, args)
     print()
 
 
@@ -1971,8 +2059,12 @@ def main():
                        help="填好數字的副本存到哪（預設 dataset_guardrail.xlsx；--cn 加 _cn、--isolate 加 _isolate；"
                             "--mock 存到 <out>/dataset_guardrail_mock.xlsx）")
     p_rep.add_argument("--dark", action="store_true", help="trade-off 圖用深色版（檔名加 _dark）")
+    p_rep.add_argument("--as-policy", metavar="POLICY",
+                       help="報表改用這組政策呈現：[M] [G1]–[G7]、dataset_guardrail xlsx 重播成它，[G8] [G10] 的「目前」"
+                            "也標它。result 要用一樣鬆或更鬆的政策跑（例如 h2o 用 --guard-policy measure 跑、這裡給 "
+                            f"strict）。可用：{', '.join(POLICIES)}")
     p_rep.add_argument("--tradeoff-t2", type=float, default=None,
-                       help="trade-off「第二道固定」那兩種組合的第二道門檻（預設 = 目前政策的 action_threshold）")
+                       help="trade-off「第二道固定」那兩種組合的第二道門檻（預設 = 報表政策的 action_threshold）")
     p_rep.add_argument("--tradeoff-review-scale", type=float, default=0.5,
                        help="trade-off「review 門檻跟著門檻走」那兩種組合的比例（預設 0.5：τ = 0.70 時正好是 0.35）")
     p_rep.add_argument("--tradeoff-macro", action="store_true",
