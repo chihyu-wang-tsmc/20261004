@@ -22,5 +22,6 @@ test6.jsonl
 deep20_coding_report/tables*.xlsx
 deep20_coding_report_h2o/tables*.xlsx
 
-# hierarchical_cpc.py 的 jevk5 回答快取，每次跑都能重生（CPC zip 有入版控，不用再下載）
+# hierarchical_cpc.py（jevk5）/ hierarchical_cpc_h2o.py（h2o）的回答快取，每次跑都能重生（CPC zip 有入版控，不用再下載）
 hierarchical_cpc/json_cache.*
+hierarchical_cpc_h2o/json_cache.*
