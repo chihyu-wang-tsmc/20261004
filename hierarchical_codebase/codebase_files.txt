@@ -1,0 +1,15 @@
+README.md
+cookbooks
+main.py
+pyproject.toml
+x/erik/260706_choice_nonce
+x/erik/260707_parallel_questions
+x/eugene/calibration
+x/eugene/clerc_bench
+x/eugene/cookbook-skill-output
+x/eugene/legal_rag/__init__.py
+x/eugene/legal_rag/eval.py
+x/eugene/legal_rag/features.py
+x/eugene/legal_rag/retrievers.py
+x/eugene/legal_rag/xenc.py
+x/eugene/pyproject.toml
