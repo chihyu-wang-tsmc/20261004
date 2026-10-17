@@ -16,6 +16,7 @@
   * MeSH 的 desc2026.zip 放在 hierarchical_biomedical/datasets/（已入版控，不用再下載；
     之後要寫 jevk5 版可以共用，跟 CPC、Shopify 的放法一樣）。
   * SVG 左上角的 TYPESAFE 改成 H2O-LIGHTNING。
+  * 每次跑完，除了英文的 <slug>_tree.svg，另外產生中文版 <slug>_tree_zh.svg（見 hierarchical_svg_zh.py）。
 
 desc2026.xml 解壓後約 313 MB，官網的 _load_mesh 是整份讀進記憶體再解析：實測載入約 30 秒、
 記憶體峰值約 2.6 GB（65,373 個位置）。
@@ -51,6 +52,7 @@ from langchain_typesafe.client import (
 )
 
 from classifier_h2o import H2OClassifier
+from hierarchical_svg_zh import write_zh_svg
 
 OUT_DIR = Path(__file__).resolve().with_name("hierarchical_biomedical_h2o")
 # 下載的 desc2026.zip 放這裡（已入版控）；之後的 jevk5 版可以共用
@@ -622,6 +624,7 @@ def main() -> None:
     for hierarchy, result in zip(HIERARCHIES, results, strict=True):
         svg_path: Path = OUT_DIR / f"{hierarchy.slug}_tree.svg"
         render_svg(hierarchy, result, svg_path)
+        write_zh_svg(hierarchy.slug, svg_path)  # 另外產生中文版 <slug>_tree_zh.svg
         beam_path: tuple[str, ...] = tuple(result["beam"][0]["path"])
         greedy_path: tuple[str, ...] = tuple(result["greedy"]["path"])
         beam_leaf: str = beam_path[-1]

@@ -15,6 +15,7 @@
     題目和選項，共用會把另一顆的答案當成自己的。
   * Shopify 的 categories.txt 和 h2o 版共用 hierarchical_shopify/datasets/ 那份（已入版控，不用再下載）。
   * SVG 左上角的 TYPESAFE 改成 JEVK5。
+  * 每次跑完，除了英文的 <slug>_tree.svg，另外產生中文版 <slug>_tree_zh.svg（見 hierarchical_svg_zh.py）。
 
 jevk5-serve 要開在 8090。用法：
     python hierarchical_shopify_jevk5.py
@@ -41,6 +42,7 @@ from langchain_typesafe.client import (
 )
 
 from classifier_jevk5 import JevK5Classifier
+from hierarchical_svg_zh import write_zh_svg
 
 OUT_DIR = Path(__file__).resolve().with_name("hierarchical_shopify_jevk5")
 # categories.txt 和 h2o 版共用這份（已入版控）
@@ -572,6 +574,7 @@ def main() -> None:
     for hierarchy, result in zip(HIERARCHIES, results, strict=True):
         svg_path: Path = OUT_DIR / f"{hierarchy.slug}_tree.svg"
         render_svg(hierarchy, result, svg_path)
+        write_zh_svg(hierarchy.slug, svg_path)  # 另外產生中文版 <slug>_tree_zh.svg
         beam_path: tuple[str, ...] = tuple(result["beam"][0]["path"])
         greedy_path: tuple[str, ...] = tuple(result["greedy"]["path"])
         beam_leaf: str = beam_path[-1]
