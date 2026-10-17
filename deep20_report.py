@@ -54,6 +54,12 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/fig1_main_tau_axis.png    同上，門檻 τ 當上方第二條 X 軸（做法 B）
     deep20_report/fig1_main_tau_axis_conf.png  同上，上方同時標 τ 與 route_conf（做法 C2）
     deep20_report/fig1_main_tau_axis_<bench>.png   做法 B 的四個 bench 各一張（gpqa / ai2arc / aime / gsm8k）
+    deep20_report/fig1_main_tau_axis_explained.png / _<bench>_explained.png
+                                      同上的說明版：圖上標 1–6，右邊逐項寫出每個數字怎麼算（需要中文字型）
+    deep20_report/fig1_main_tau_axis_explained_no_down.png / _<bench>_explained_no_down.png
+                                      同上，但不標往下掉的階（▼），只到 ⑤
+    deep20_report/fig1_main_tau_axis[_<bench>]_explained_no_down_chart.png / .txt
+                                      不標 ▼ 那版拆成只有圖、只有文字兩個檔，給投影片用
     deep20_report/fig2_per_bench.png  正文圖 2：四個 bench 分開看
     deep20_report/fig2_per_bench_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
     deep20_report/fig2_per_bench_zoom.png   同上，Y 軸每格各自從藍線附近開始（跨距各格不同）
@@ -676,6 +682,10 @@ def analyse(data, n_boot):
         "quad": quadrants(data),
         "class_curve": classification_curve(data),
     }
+    # 依 route_p 由高到低（= 藍線的升級順序）排好的逐題資料，fig1_explained 拿來逐項拆解
+    order = np.argsort(-data.p, kind="stable")
+    a["sorted"] = {"p": data.p[order], "delta": (data.cp - data.cf)[order],
+                   "kf": data.kf[order], "kp": data.kp[order]}
     a["cal"], a["ece"], a["mce"], a["cal_n"] = calibration(data, include_none=False)
     _, a["ece_incl"], _, _ = calibration(data, include_none=True)
     a["n_boot"] = n_boot
@@ -829,8 +839,19 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     """
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8.4, 5.4))
+    _fig1_axes(ax, a, c, band=band, random=random, tau=tau, title=title)
+    # 圖例放在繪圖區外（下方），不壓到資料
+    n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
+              labelcolor=c["ink2"], fontsize=8.5)
+    _save(fig, path, c)
+
+
+def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
+    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。"""
     style_axes(ax, c)
     r, o, d, s = a["router"], a["oracle"], a["random"], a["star"]
+    axt = None
 
     if band and a["lo"] is not None:
         ax.fill_between(GRID, a["lo"], a["hi"], color=c["band"], alpha=0.16, linewidth=0,
@@ -871,16 +892,215 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
         ax.set_xlim(-0.02, 1.02)   # 畫記號可能撐開範圍，設回來
         ax.set_ylim(lo, hi)
     elif tau in ("axis", "axis-conf"):
-        draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
+        axt = draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
     if title:  # 上方有 τ 刻度時要讓開它（axis-conf 還多一行刻度和軸標題）
         ax.set_title(title, color=c["ink"], fontsize=11, loc="left",
                      pad={"axis": 22, "axis-conf": 48}.get(tau, 8))
+    return lo, hi, axt
 
-    # 圖例放在繪圖區外（下方），不壓到資料
-    n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
-              labelcolor=c["ink2"], fontsize=8.5)
+
+def _explained_chart(ax, a, c, drops):
+    """說明版左邊的圖：圖 1（上方標 τ）加上 1–6 的標記、τ = 0.5 的讀圖路徑、往下掉的階（▼）。
+
+    fig1_explained（圖文合一）和 fig1_explained_split（只有圖）共用。回傳有沒有標 ▼。
+    """
+    import matplotlib.pyplot as plt
+    q, srt, r = a["quad"], a["sorted"], a["router"]
+    af, ap, ceil = a["acc_fast"], a["acc_pow"], a["ceiling"]
+    delta, p = srt["delta"], srt["p"]
+
+    lo, hi, axt = _fig1_axes(ax, a, c, tau="axis")
+    ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（上行）／這個作業點的 $ 每千題（下行）",
+                  color=c["ink2"])
+    ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
+    axt.set_xlabel("上方 X 軸：門檻 τ（route_p ≥ τ 的題目送 powerful）", color=c["ink2"],
+                   labelpad=6)
+
+    def badge(x, y, num, dx, dy):
+        ax.annotate(str(num), (x, y), xytext=(dx, dy), textcoords="offset points",
+                    ha="center", va="center", color=c["ink"], fontsize=10, zorder=9,
+                    bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
+                    arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
+
+    # ①② 兩端點 ③ oracle 轉折 ④ 綠線右端和 ② 的差
+    badge(0, af, 1, 22, -22)
+    badge(1, ap, 2, -22, -24)
+    knee = a["knee"]
+    ax.plot([knee], [ceil], "o", ms=6, color=c["oracle"], markeredgecolor=c["surface"],
+            markeredgewidth=1.5, zorder=6)
+    badge(knee, ceil, 3, 18, 16)
+    if q["fast_only"]:
+        ax.annotate("", (0.992, ap), (0.992, ceil),
+                    arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0))
+        badge(0.992, (ap + ceil) / 2, 4, -22, 0)
+
+    # ⑤ τ = 0.5：從上方刻度往下對到藍線，再往左讀 Y、往下讀 X
+    k5 = int((p >= 0.5).sum())
+    x5, y5 = r["call"][k5], r["acc"][k5]
+    path_kw = dict(color=c["ink2"], lw=0.9, ls=(0, (1.5, 2.5)), zorder=2)
+    ax.plot([x5, x5], [hi, lo], **path_kw)
+    ax.plot([-0.02, x5], [y5, y5], **path_kw)
+    ax.plot([x5], [y5], "o", ms=12, markerfacecolor="none", markeredgecolor=c["ink"],
+            markeredgewidth=1.4, zorder=7)
+    badge(x5, y5, 5, 20, 18)
+
+    # ⑥ 每一個往下掉的階：升級到「fast 對、powerful 錯」的題目
+    down = np.where(delta < 0)[0]
+    show_drops = drops and len(down) > 0
+    if show_drops:
+        ax.plot(r["call"][down + 1], r["acc"][down + 1], "v", ms=7, color=c["mark"],
+                markeredgecolor=c["surface"], markeredgewidth=1.0, zorder=6)
+        mid = down[np.argmin(np.abs(r["call"][down + 1] - 0.5))]
+        badge(r["call"][mid + 1], r["acc"][mid + 1], 6, 0, -26)
+
+    handles = [
+        plt.Line2D([], [], color=c["router"], lw=2.2, label=f"{ROUTER_NAME} model_route"),
+        plt.Line2D([], [], color=c["oracle"], lw=1.6, label="Oracle（上界）"),
+    ]
+    if show_drops:
+        handles.append(plt.Line2D([], [], color=c["mark"], marker="v", ls="", ms=7, label="往下一階"))
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=len(handles),
+              labelcolor=c["ink2"], fontsize=9)
+    return show_drops
+
+
+def _explained_lines(a, show_drops):
+    """說明版右邊的逐項推導。回傳 [(縮排層級, 純文字, 樣式, 給 matplotlib 的版本或 None)]。
+
+    樣式：h = 小標題、b = 本文、m = 次要、t = 2×2 對錯表（純文字欄放 rows）。
+    純文字給 .txt（貼進投影片）；matplotlib 版本是 None 時由純文字把 $ 跳脫後畫——金額的 $
+    一多，matplotlib 會把兩個 $ 之間當數學式。只有兩條公式另外寫了數學式版本。
+    """
+    n, q, srt, r = a["n"], a["quad"], a["sorted"], a["router"]
+    af, ap, ceil, knee = a["acc_fast"], a["acc_pow"], a["ceiling"], a["knee"]
+    delta, p = srt["delta"], srt["p"]
+    k5 = int((p >= 0.5).sum())
+    x5, y5 = r["call"][k5], r["acc"][k5]
+    pct1 = lambda v: f"{v:.1%}"
+    # 一題的份量在大 N 時不到 0.1%（AI2ARC 1/3548），印成 0.0% 會被讀成「沒影響」
+    pct_s = lambda v: f"{v:.2%}" if 0 < abs(v) < 0.01 else f"{v:.1%}"
+    up5, dn5 = int((delta[:k5] > 0).sum()), int((delta[:k5] < 0).sum())
+    pow5, fast5 = srt["kp"][:k5].sum(), srt["kf"][k5:].sum()
+    pr = PRICES
+    table = [("", "powerful 對", "powerful 錯"),
+             ("fast 對", q["both"], q["fast_only"]), ("fast 錯", q["pow_only"], q["none"])]
+    lines = [
+        (0, f"fast = {ROUTE_FAST}　powerful = {ROUTE_POWERFUL}　router = {ROUTER_NAME}", "m", None),
+        (0, "兩個 model 對 N 題各答一次的結果", "h", None),
+        (0, table, "t", None),
+        (0, f"圖上 1–{6 if show_drops else 5} 的數字怎麼來", "h", None),
+        (0, f"① 全送 fast（左端黑點）= ({q['both']} + {q['fast_only']}) / {n} = {pct1(af)}", "b", None),
+        (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b", None),
+        (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b", None),
+        (1, f"在 {q['pow_only']} / {n} = {pct1(knee)} 到頂，"
+            f"天花板 = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
+    ]
+    if q["fast_only"]:
+        lines.append((0, f"④ 綠線比 ② 高 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
+                         f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 不升級", "b", None))
+    lines += [
+        (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {k5} 題 → {k5} / {n} = {pct1(x5)}", "b", None),
+        (1, f"其中 +1 有 {up5} 題、-1 有 {dn5} 題 → {pct1(af)} + ({up5} - {dn5}) / {n} = {pct1(y5)}",
+         "b", None),
+        (1, f"$ = (前 {k5} 題 powerful ${pow5:.4f} + 其餘 {n - k5} 題 fast ${fast5:.4f}) / {n} × 1000"
+            f" = ${r['cost'][k5] * 1000:.2f}", "b", None),
+    ]
+    if show_drops:
+        lines.append((0, f"⑥ ▼ 升級到「fast 對、powerful 錯」的題目，正確率掉 1 / {n} = {pct_s(1 / n)}"
+                         f"（共 {q['fast_only']} 題）", "b", None))
+    lines += [
+        (0, "三條軸", "h", None),
+        (0, "Y　照門檻分派後，N 題最後答對的比例（不是 router 選對的比例）", "b", None),
+        (1, "藍線 A(k) = A_F + (1/N) × Σ(j ≤ k) (y_P - y_F)，每一項是 +1、0 或 -1", "b",
+         r"藍線 $A(k) = A_F + (1/N)\,\Sigma_{j \leq k}\,(y_P - y_F)$，每一項是 +1、0 或 -1"),
+        (0, "下方 X 上行　呼叫比例 = k / N，k = 送 powerful 的題數", "b", None),
+        (0, "下方 X 下行　$(k) = [ Σ前 k 題 cost_P + Σ其餘 cost_F ] / N × 1000", "b",
+         r"下方 X 下行　\$(k) = [ Σ前 k 題 cost$_P$ + Σ其餘 cost$_F$ ] / N × 1000"),
+        (1, "每題 cost = 輸入 token × 輸入單價 + 輸出 token × 輸出單價（實際用量）", "b", None),
+        (1, f"單價（$ / 百萬 token，輸入 / 輸出）：fast {pr['fast']['in']:g} / {pr['fast']['out']:g}，"
+            f"powerful {pr['powerful']['in']:g} / {pr['powerful']['out']:g}", "b", None),
+        (1, f"平均每千題：fast ${a['cost_fast'] * 1000:.2f}，powerful ${a['cost_pow'] * 1000:.2f}"
+            "；不含守門開銷；照藍線的升級順序算，只適用藍線", "b", None),
+        (0, f"上方 X　門檻 τ：route_p ≥ τ 的題目送 powerful（route_p = {ROUTER_NAME} 給 powerful 的機率）",
+         "b", None),
+        (1, "刻度位置 = route_p ≥ τ 的題數 / N："
+            + "、".join(f"{tv:g} → {int((p >= tv).sum())} 題" for tv in (0.9, 0.7, 0.5, 0.3, 0.1)),
+         "b", None),
+        (0, "怎麼讀", "h", None),
+        (0, "上方選一個 τ → 往下對到藍線讀 Y → 再往下讀呼叫比例與 $（⑤ 的點線就是一例）", "b", None),
+    ]
+    if PRICES_ARE_PLACEHOLDER:
+        lines.append((0, "注意：PRICES 還是示意單價，所有 $ 的數字都不能引用", "b", None))
+    return lines
+
+
+def fig1_explained(a, c, path, name, drops=True):
+    """圖 1（上方標 τ）的說明版：圖上用 1–6 標出每個數字的位置，右邊逐項寫出怎麼算。
+
+    drops=True 時每一個往下掉的階都標 ▼（⑥）；False 是不標 ▼ 的版本（_explained_no_down），
+    圖上只到 ⑤，右邊也不寫 ⑥。沒有往下掉的階時兩版一樣。
+
+    圖面和 fig1_main(tau="axis") 相同，另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
+    不放 CPT 和隨機升級（以及拿隨機升級當基準的 APGR）：只留看懂藍線、綠線本身需要的東西。
+    右邊的數字全部從 a 算，換資料、換 model 配對、換 router（ROUTER_NAME）都會跟著變，不是寫死的。
+    乾淨版照舊產生；這張只是多一張，給第一次看圖的人。圖和文字分開的版本見 fig1_explained_split。
+    """
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(17.5, 9.8))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.18, 1], wspace=0.05,
+                          left=0.05, right=0.99, top=0.88, bottom=0.14)
+    ax, ax_t = fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
+    show_drops = _explained_chart(ax, a, c, drops)
+    fig.suptitle(f"{name}　N = {a['n']}　怎麼讀這張圖", x=0.05, y=0.975, ha="left",
+                 color=c["ink"], fontsize=15)
+
+    ax_t.axis("off")
+    y, step = 1.0, 0.0262
+    for indent, text, style, mpl in _explained_lines(a, show_drops):
+        if style == "h":
+            y -= step * 0.55
+            ax_t.text(0, y, text, transform=ax_t.transAxes, va="top", color=c["ink"], fontsize=11.5)
+            y -= step * 1.15
+            continue
+        if style == "t":  # 2×2 的對錯表
+            xs = (0.02, 0.24, 0.42)
+            for i, row in enumerate(text):
+                for x, cell in zip(xs, row):
+                    ax_t.text(x, y - i * step, str(cell), transform=ax_t.transAxes, va="top",
+                              color=c["ink"] if i and x > 0.1 else c["ink2"], fontsize=10)
+            y -= step * len(text)
+            continue
+        ax_t.text(0.03 * indent, y, mpl if mpl is not None else text.replace("$", r"\$"),
+                  transform=ax_t.transAxes, va="top", fontsize=9.6,
+                  color=c["muted"] if style == "m" else c["ink"])
+        y -= step
     _save(fig, path, c)
+
+
+def fig1_explained_split(a, c, png_path, txt_path, name, drops=False):
+    """說明版拆成「只有圖」的 PNG 和「只有文字」的 .txt，方便分別放進投影片。
+
+    圖和 fig1_explained 左半邊相同（1–5 或 1–6 的標記、讀圖路徑），尺寸改成適合放一頁投影片；
+    文字和右半邊相同，純文字、UTF-8，可以直接貼進文字方塊。2×2 對錯表用 Tab 分欄，
+    貼進 PowerPoint 的表格會自動分格。
+    """
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(10.5, 6.6))
+    show_drops = _explained_chart(ax, a, c, drops)
+    ax.set_title(f"{name}　N = {a['n']}", color=c["ink"], fontsize=11, loc="left", pad=34)
+    _save(fig, png_path, c)
+
+    out = [f"{name}　N = {a['n']}　怎麼讀這張圖"]
+    for indent, text, style, _ in _explained_lines(a, show_drops):
+        if style == "h":
+            out += ["", text]
+        elif style == "t":
+            out += ["\t".join(str(cell) for cell in row) for row in text]
+        else:
+            out.append("　　" * indent + text)
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
+    print(f"  → {os.path.relpath(txt_path, HERE)}")
 
 
 def _acc_range(a):
@@ -1557,6 +1777,23 @@ def cmd_report(args):
             for name, b in per_bench.items():
                 fig1_main(b, c, os.path.join(args.out, f"fig1_main_tau_axis_{name}{sfx}.png"),
                           tau=variant, title=f"{name.upper()}　n = {b['n']}", **kw)
+            # 說明版：圖上標 1–6，右邊逐項推導。全是中文，沒有 CJK 字型就不畫（不要變豆腐）
+            # 兩版：_explained 標出每一個往下掉的階（▼），_explained_no_down 不標
+            if ZH:
+                for tag, drops in (("", True), ("_no_down", False)):
+                    fig1_explained(a, c, os.path.join(
+                        args.out, f"fig1_main_tau_axis_explained{tag}{sfx}.png"), "合計", drops)
+                    for name, b in per_bench.items():
+                        fig1_explained(b, c, os.path.join(
+                            args.out, f"fig1_main_tau_axis_{name}_explained{tag}{sfx}.png"),
+                            name.upper(), drops)
+                # 不標 ▼ 那版另外拆成「只有圖」+「只有文字」，給投影片用（.txt 不分深淺色）
+                for key, b, label in [("", a, "合計")] + [
+                        (f"_{name}", b, name.upper()) for name, b in per_bench.items()]:
+                    base = os.path.join(args.out, f"fig1_main_tau_axis{key}_explained_no_down")
+                    fig1_explained_split(b, c, f"{base}_chart{sfx}.png", f"{base}.txt", label)
+            else:
+                print("  [skip] fig1_main_tau_axis_*_explained：找不到中文字型")
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
         # 曲線上的 τ 記號畫的是原始正確率，所以 norm 版只出 axis
         if variant != "axis-conf":
