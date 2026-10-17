@@ -46,6 +46,23 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     python deep20_report.py report --with-band --boot 2000   # 改 bootstrap 次數
     python deep20_report.py report --out somewhere # 改輸出目錄
 
+---- report_muli_fast：powerful 固定、比好幾個 fast ----
+
+powerful 固定是 ROUTE_POWERFUL（gemini-3.7-flash），fast 可以一次比好幾個（deepseek、qwen、gemma…）。
+router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣，所以不用重跑 deep20.py run：
+先照常跑過 prepare，再讓每個 fast 對四個 bench 作答就好。
+
+    python gpqa_routing.py answer --model qwen3.8-27b       # 每個要比的 fast、每個 bench 各跑一次
+    python deep20_report.py report_muli_fast                # 自動找 answers/ 底下的 fast
+    python deep20_report.py report_muli_fast --fast deepseek-flash qwen3.8-27b gemma-4-xxx
+    python deep20_report.py report_muli_fast --mock         # 示意資料（三個假的 fast）
+    python deep20_report.py report_muli_fast --per-fast full    # 每個 fast 另出和 report 一樣的整套
+    python deep20_report.py report_muli_fast --dark         # 深色版
+    （report_multi_fast 是同一個指令的別名）
+
+只比「每個 fast 都有有效作答」的交集；缺哪個 bench 的哪些題，報表開頭的 [覆蓋] 會列出要跑的指令。
+各 fast 的單價填在 FAST_PRICES，沒填的暫用 PRICES["fast"]，報表與圖上會標出來。
+
 ---- 產出 ----
 
     deep20_report/joined.jsonl        prepare 的產物
@@ -71,6 +88,15 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/figA2_calibration.png  附錄 A 圖 A2：校準圖 + ECE
     deep20_report/figB1_guard_cost.png   附錄 B 圖 B1：含／不含守門開銷
     deep20_report/figB2_conf_by_dataset.png  附錄 B 圖 B2：50 個資料集的 route_conf
+    deep20_report/multi_fast/         report_muli_fast 的產物：
+        curve_tau_axis[_<bench>].png        各 fast 的藍線疊在一起，上方 τ（每個 fast 共用）
+        cost[_<bench>].png                  X 換成 $ 每千題（各 fast 的 $ 不同，不能共用呼叫比例軸）
+        per_bench_tau_axis.png              四個 bench 各一格
+        curve_tau_axis[_<bench>]_explained.png / _explained_chart.png / _explained.txt
+                                            說明版（圖上標 1–4、右邊逐項推導）與拆開的圖／文字
+        tables.xlsx                         各 fast × 各 bench 的摘要、作答覆蓋、曲線、逐題資料
+        <fast>/                             每個 fast 單一 fast 的 fig1_main_tau_axis 與說明版
+                                            （--per-fast full 時是和 report 一樣的整套）
     deep20_report/tables.xlsx         表 1（摘要）／表 A1（各 bench）／表 A2（能力重疊，逐 dataset
                                       的 fast×powerful 2×2）／表 A3（混淆矩陣）／校準分箱／
                                       曲線原始值／方法參數／逐題資料
@@ -82,6 +108,7 @@ PRICES（下面）是**示意單價**。報表每次都會把用到的單價印�
 """
 
 import argparse
+import contextlib
 import hashlib
 import importlib
 import json
@@ -828,6 +855,25 @@ def draw_tau_axis(ax, a, c, fontsize=8, label=False, conf=False):
     return axt
 
 
+def small_tau_axis(ax, a, c):
+    """小圖用的上方 τ 刻度（做法 B 的減量版）：只標 0.9 / 0.7 / 0.5 / 0.3 / 0.1。"""
+    axt = ax.twiny()
+    axt.set_xlim(ax.get_xlim())
+    axt.set_facecolor("none")
+    axt.grid(False)
+    for side in ("bottom", "left", "right"):
+        axt.spines[side].set_visible(False)
+    axt.spines["top"].set_color(c["axis"])
+    pts = tau_ladder(a, (0.9, 0.7, 0.5, 0.3, 0.1))
+    keep = thin_labels(pts, min_gap=0.09)
+    axt.set_xticks([x for i, (_, x, _) in enumerate(pts) if i in keep])
+    axt.set_xticklabels([f"τ={tv:g}" if i == min(keep) else f"{tv:g}"
+                         for i, (tv, _, _) in enumerate(pts) if i in keep])
+    axt.tick_params(axis="x", colors=c["muted"], labelcolor=c["ink2"],
+                    labelsize=7, length=3)
+    return axt
+
+
 def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     """正文圖 1：成本–品質曲線。X 軸同一個量（成本）標兩套刻度：呼叫比例 + $／千題。
 
@@ -1188,20 +1234,7 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fi
             ax.set_xlim(-0.02, 1.02)
             ax.set_ylim(lo, hi)
         elif tau == "axis":
-            axt = ax.twiny()
-            axt.set_xlim(ax.get_xlim())
-            axt.set_facecolor("none")
-            axt.grid(False)
-            for side in ("bottom", "left", "right"):
-                axt.spines[side].set_visible(False)
-            axt.spines["top"].set_color(c["axis"])
-            pts = tau_ladder(a, (0.9, 0.7, 0.5, 0.3, 0.1))
-            keep = thin_labels(pts, min_gap=0.09)
-            axt.set_xticks([x for i, (_, x, _) in enumerate(pts) if i in keep])
-            axt.set_xticklabels([f"τ={tv:g}" if i == min(keep) else f"{tv:g}"
-                                 for i, (tv, _, _) in enumerate(pts) if i in keep])
-            axt.tick_params(axis="x", colors=c["muted"], labelcolor=c["ink2"],
-                            labelsize=7, length=3)
+            small_tau_axis(ax, a, c)
     handles = [
         plt.Line2D([], [], color=c["router"], lw=2.0, label=f"{ROUTER_NAME} model_route"),
         plt.Line2D([], [], color=c["oracle"], lw=1.3, label="Oracle (upper bound)"),
@@ -1536,7 +1569,9 @@ def write_excel(a, per_bench, data, path, args):
     })
 
     tmeta = pd.DataFrame([
-        {"項目": "資料來源", "值": "示意資料（--mock）" if args.mock else os.path.join(args.out, JOINED)},
+        # report_muli_fast --per-fast full 會把 args.source 設成「joined.jsonl + 哪個 answers 檔」
+        {"項目": "資料來源", "值": "示意資料（--mock）" if args.mock else
+         getattr(args, "source", None) or os.path.join(args.out, JOINED)},
         {"項目": "題數 N", "值": a["n"]},
         {"項目": "fast model", "值": ROUTE_FAST},
         {"項目": "powerful model", "值": ROUTE_POWERFUL},
@@ -1746,14 +1781,52 @@ def cmd_report(args):
     data = Data(rows)
     if data.n < 10:
         raise SystemExit(f"只有 {data.n} 題，畫不出有意義的曲線")
+    render_report(data, args, args.out)
 
+
+def per_bench_analyses(data, n_boot):
+    """每個 bench 各跑一次 analyse()，依 bench 名稱排序。"""
+    # 單一 bench 題數少，bootstrap 次數照用，但題數太少時誤差帶本來就該很寬
+    return {name: analyse(data.subset(data.bench == name), n_boot)
+            for name in sorted(set(data.bench))}
+
+
+def fig1_tau_axis_set(a, per_bench, c, out, sfx="", **kw):
+    """fig1_main_tau_axis 這一家：合計 + 每個 bench 各一張，加上說明版與拆開的圖／文字。
+
+    report 的 --tau axis 和 report_muli_fast 的每個 fast 子目錄都用這一組。
+    """
+    fig1_main(a, c, os.path.join(out, f"fig1_main_tau_axis{sfx}.png"), tau="axis", **kw)
+    for name, b in per_bench.items():  # 四個 bench 各一張，版面和合計那張相同
+        fig1_main(b, c, os.path.join(out, f"fig1_main_tau_axis_{name}{sfx}.png"),
+                  tau="axis", title=f"{name.upper()}　n = {b['n']}", **kw)
+    # 說明版：圖上標 1–6，右邊逐項推導。全是中文，沒有 CJK 字型就不畫（不要變豆腐）
+    # 兩版：_explained 標出每一個往下掉的階（▼），_explained_no_down 不標
+    if not ZH:
+        print("  [skip] fig1_main_tau_axis_*_explained：找不到中文字型")
+        return
+    for tag, drops in (("", True), ("_no_down", False)):
+        fig1_explained(a, c, os.path.join(
+            out, f"fig1_main_tau_axis_explained{tag}{sfx}.png"), "合計", drops)
+        for name, b in per_bench.items():
+            fig1_explained(b, c, os.path.join(
+                out, f"fig1_main_tau_axis_{name}_explained{tag}{sfx}.png"),
+                name.upper(), drops)
+    # 不標 ▼ 那版另外拆成「只有圖」+「只有文字」，給投影片用（.txt 不分深淺色）
+    for key, b, label in [("", a, "合計")] + [
+            (f"_{name}", b, name.upper()) for name, b in per_bench.items()]:
+        base = os.path.join(out, f"fig1_main_tau_axis{key}_explained_no_down")
+        fig1_explained_split(b, c, f"{base}_chart{sfx}.png", f"{base}.txt", label)
+
+
+def render_report(data, args, out):
+    """report 的本體：算數字、印報表、畫 PNG、寫 Excel，全部寫進 out。
+
+    cmd_report 用它出 deep20_report/；report_muli_fast --per-fast full 用它替每個 fast 出一份。
+    """
     print(f"\n分析 {data.n} 題…（bootstrap {args.boot} 次）", flush=True)
     a = analyse(data, args.boot)
-    per_bench = {}
-    for name in sorted(set(data.bench)):
-        sub = data.subset(data.bench == name)
-        # 單一 bench 題數少，bootstrap 次數照用，但題數太少時誤差帶本來就該很寬
-        per_bench[name] = analyse(sub, args.boot)
+    per_bench = per_bench_analyses(data, args.boot)
 
     print_report(a, per_bench, args)
 
@@ -1763,37 +1836,19 @@ def cmd_report(args):
     sfx = "_dark" if args.dark else ""
     kw = dict(band=args.with_band, random=args.with_random)
     # 乾淨版（不標 τ）一定產出；再按 --tau 另存標了 τ 的版本，檔名加後綴，不覆蓋
-    fig1_main(a, c, os.path.join(args.out, f"fig1_main{sfx}.png"), **kw)
-    fig2_per_bench(per_bench, c, os.path.join(args.out, f"fig2_per_bench{sfx}.png"), **kw)
+    fig1_main(a, c, os.path.join(out, f"fig1_main{sfx}.png"), **kw)
+    fig2_per_bench(per_bench, c, os.path.join(out, f"fig2_per_bench{sfx}.png"), **kw)
     for y in ("zoom", "norm"):
-        fig2_per_bench(per_bench, c, os.path.join(args.out, f"fig2_per_bench_{y}{sfx}.png"),
+        fig2_per_bench(per_bench, c, os.path.join(out, f"fig2_per_bench_{y}{sfx}.png"),
                        y=y, **kw)
     for variant in (list(TAU_VARIANTS) if args.tau == "all" else
                     [] if args.tau == "none" else [args.tau]):
         stem = variant.replace("-", "_")
-        fig1_main(a, c, os.path.join(args.out, f"fig1_main_tau_{stem}{sfx}.png"),
-                  tau=variant, **kw)
-        if variant == "axis":  # 四個 bench 各一張，版面和合計那張相同
-            for name, b in per_bench.items():
-                fig1_main(b, c, os.path.join(args.out, f"fig1_main_tau_axis_{name}{sfx}.png"),
-                          tau=variant, title=f"{name.upper()}　n = {b['n']}", **kw)
-            # 說明版：圖上標 1–6，右邊逐項推導。全是中文，沒有 CJK 字型就不畫（不要變豆腐）
-            # 兩版：_explained 標出每一個往下掉的階（▼），_explained_no_down 不標
-            if ZH:
-                for tag, drops in (("", True), ("_no_down", False)):
-                    fig1_explained(a, c, os.path.join(
-                        args.out, f"fig1_main_tau_axis_explained{tag}{sfx}.png"), "合計", drops)
-                    for name, b in per_bench.items():
-                        fig1_explained(b, c, os.path.join(
-                            args.out, f"fig1_main_tau_axis_{name}_explained{tag}{sfx}.png"),
-                            name.upper(), drops)
-                # 不標 ▼ 那版另外拆成「只有圖」+「只有文字」，給投影片用（.txt 不分深淺色）
-                for key, b, label in [("", a, "合計")] + [
-                        (f"_{name}", b, name.upper()) for name, b in per_bench.items()]:
-                    base = os.path.join(args.out, f"fig1_main_tau_axis{key}_explained_no_down")
-                    fig1_explained_split(b, c, f"{base}_chart{sfx}.png", f"{base}.txt", label)
-            else:
-                print("  [skip] fig1_main_tau_axis_*_explained：找不到中文字型")
+        if variant == "axis":
+            fig1_tau_axis_set(a, per_bench, c, out, sfx, **kw)
+        else:
+            fig1_main(a, c, os.path.join(out, f"fig1_main_tau_{stem}{sfx}.png"),
+                      tau=variant, **kw)
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
         # 曲線上的 τ 記號畫的是原始正確率，所以 norm 版只出 axis
         if variant != "axis-conf":
@@ -1801,22 +1856,800 @@ def cmd_report(args):
                 if y == "norm" and variant != "axis":
                     continue
                 fig2_per_bench(per_bench, c,
-                               os.path.join(args.out, f"fig2_per_bench{tag}_tau_{stem}{sfx}.png"),
+                               os.path.join(out, f"fig2_per_bench{tag}_tau_{stem}{sfx}.png"),
                                tau=variant, y=y, **kw)
-    fig3_routep(data, a, c, os.path.join(args.out, f"fig3_routep{sfx}.png"))
-    figA1_y_axis(a, c, os.path.join(args.out, f"figA1_y_axis{sfx}.png"))
-    figA2_calibration(a, c, os.path.join(args.out, f"figA2_calibration{sfx}.png"))
+    fig3_routep(data, a, c, os.path.join(out, f"fig3_routep{sfx}.png"))
+    figA1_y_axis(a, c, os.path.join(out, f"figA1_y_axis{sfx}.png"))
+    figA2_calibration(a, c, os.path.join(out, f"figA2_calibration{sfx}.png"))
     if args.appendix_b:
-        figB1_guard_cost(a, c, os.path.join(args.out, f"figB1_guard_cost{sfx}.png"))
+        figB1_guard_cost(a, c, os.path.join(out, f"figB1_guard_cost{sfx}.png"))
         groups = mock_conf_by_dataset() if args.mock else conf_by_dataset()
         if groups:
-            figB2_conf(groups, c, os.path.join(args.out, f"figB2_conf_by_dataset{sfx}.png"))
+            figB2_conf(groups, c, os.path.join(out, f"figB2_conf_by_dataset{sfx}.png"))
         else:
             print("  [skip] 圖 B2：deep20_results/ 裡沒有 route_conf")
 
     print("\n寫 Excel")
-    write_excel(a, per_bench, data, os.path.join(args.out, "tables.xlsx"), args)
-    print(f"\n完成 → {os.path.relpath(args.out, HERE)}/\n")
+    write_excel(a, per_bench, data, os.path.join(out, "tables.xlsx"), args)
+    print(f"\n完成 → {os.path.relpath(out, HERE)}/\n")
+
+
+# ============================================================================
+# report_muli_fast：powerful 固定、fast 換好幾個 model 比
+# ============================================================================
+# 為什麼不用重跑 deep20.py run、也不用另一份 prepare：
+#     route_p 是 router 只看題目給的（deep20.py 的 ROUTE_FAST 註解：router 看不到 model 身分），
+#     所以「哪幾題先升級」對每個 fast 都一樣。換 fast 只改變每一題的 c_fast / cost_fast，
+#     也就是藍線每一階是 +1、0 還是 −1。那兩個欄位直接從 <bench>/answers/<fast>.jsonl 讀
+#     （答案檔是按題目 id 存的，joined.jsonl 也有 qid），不需要 import <bench>_routing。
+#
+# 題目範圍：joined.jsonl 的 N 題（prepare 時 ROUTE_FAST 與 ROUTE_POWERFUL 都有有效作答的那些），
+# 再取「每個要比的 fast 都有有效作答」的交集。不同 fast 用不同題目比，數字就不能互比。
+
+# 每個 fast model 的單價（$ / 百萬 token，輸入 / 輸出）。**示意值，務必換成實際報價。**
+# 沒列在這裡的 model 暫用 PRICES["fast"]，報表、圖上的文字和 Excel 都會標出是哪幾個。
+FAST_PRICES = {
+    "deepseek-flash": {"in": 0.27, "out": 1.10},
+    # "qwen3.8-27b": {"in": ..., "out": ...},
+    # "gemma-4-...": {"in": ..., "out": ...},
+}
+
+MULTI_FAST_DIR = "multi_fast"   # 輸出在 <out>/multi_fast/
+
+# --mock 用的示意 fast：(名稱, 每個 bench 的正確率增減, token 倍率)。
+# 第一個就是 mock_rows() 本身；其餘從它翻動一部分題目的對錯：變弱時優先翻 route_p 高（難）的題，
+# 變強時優先翻 route_p 低（簡單）的題，所以 route_p 對它們仍然有鑑別力。
+MOCK_FAST = (
+    ("deepseek-flash", 0.00, 1.0),
+    ("qwen3.8-27b", +0.03, 1.8),
+    ("gemma-4", -0.07, 0.6),
+)
+
+
+def fast_price(model):
+    """(這個 fast 的單價, 是不是沒填、暫用 PRICES["fast"])。"""
+    if model in FAST_PRICES:
+        return FAST_PRICES[model], False
+    return PRICES["fast"], True
+
+
+def _cost(in_tok, out_tok, price):
+    return (in_tok or 0) / 1e6 * price["in"] + (out_tok or 0) / 1e6 * price["out"]
+
+
+def safe_name(model):
+    return re.sub(r"[^0-9A-Za-z._-]", "_", model)
+
+
+def answers_file(bench, model):
+    """<bench>_routing.py answer --model <model> 寫的檔（routing_bench.Bench.answers_dir）。"""
+    return os.path.join(HERE, bench, "answers", f"{model}.jsonl")
+
+
+@contextlib.contextmanager
+def as_fast_model(model):
+    """暫時把 ROUTE_FAST / PRICES["fast"] 換成這個 fast，單一 fast 的圖與文字就會寫它的名字和單價。"""
+    global ROUTE_FAST
+    saved = ROUTE_FAST, PRICES["fast"]
+    ROUTE_FAST, PRICES["fast"] = model, fast_price(model)[0]
+    try:
+        yield
+    finally:
+        ROUTE_FAST, PRICES["fast"] = saved
+
+
+def detect_fast_models(benches):
+    """沒給 --fast 時：每個 bench 的 answers/ 底下都有作答檔的 model（不含 powerful）。
+
+    只有部分 bench 有作答的不自動收：收進來的話交集會把其他 bench 整個丟掉。
+    回傳 (要比的, 只有部分 bench 有的)；ROUTE_FAST 排第一，其餘照名稱。
+    """
+    found = []
+    for b in benches:
+        d = os.path.join(HERE, b, "answers")
+        names = {fn[:-len(".jsonl")] for fn in os.listdir(d) if fn.endswith(".jsonl")} \
+            if os.path.isdir(d) else set()
+        found.append(names - {ROUTE_POWERFUL})
+    if not found:
+        return [], []
+    full, anywhere = set.intersection(*found), set.union(*found)
+    order = lambda m: (m != ROUTE_FAST, m)
+    return sorted(full, key=order), sorted(anywhere - full, key=order)
+
+
+def multi_fast_rows(base, models):
+    """真資料：joined.jsonl 的每一題換上各 fast 的 c_fast / tok_fast / cost_fast。
+
+    回傳 ({fast: rows}, 覆蓋表 {fast: {bench: (有效作答題數, 該 bench 題數)}})。
+    rows 只含交集，所以每個 fast 的 rows 是同一組題目、同樣的順序。
+    """
+    benches = sorted({r["bench"] for r in base})
+    n_bench = Counter(r["bench"] for r in base)
+    answers = {m: {b: {qid: r for qid, r in read_jsonl(answers_file(b, m)).items() if r.get("ok")}
+                   for b in benches} for m in models}
+    coverage = {m: {b: (sum(1 for r in base if r["bench"] == b and r["qid"] in answers[m][b]),
+                        n_bench[b]) for b in benches} for m in models}
+    common = [r for r in base if all(r["qid"] in answers[m][r["bench"]] for m in models)]
+    out = {}
+    for m in models:
+        price, _ = fast_price(m)
+        rows = []
+        for r in common:
+            f = answers[m][r["bench"]][r["qid"]]
+            rows.append({**r, "fast_model": m, "c_fast": int(bool(f["correct"])),
+                         "tok_fast": (f.get("input_tokens") or 0) + (f.get("output_tokens") or 0),
+                         "cost_fast": _cost(f.get("input_tokens"), f.get("output_tokens"), price)})
+        out[m] = rows
+    return out, coverage
+
+
+def mock_multi_fast(base, models, seed=20261017):
+    """示意資料：以 mock_rows() 為底，照 MOCK_FAST 的設定翻出其他 fast 的對錯與 token。
+
+    亂數用 (seed, 名字) 當種子：同一個 fast 不管和誰一起比，抽到的示意資料都一樣。
+    """
+    spec = {name: (shift, mult) for name, shift, mult in MOCK_FAST}
+    cf = np.array([r["c_fast"] for r in base])
+    p = np.array([r["route_p"] for r in base])
+    bench = np.array([r["bench"] for r in base])
+    out = {}
+    for m in models:
+        h = int(hashlib.sha1(m.encode("utf-8")).hexdigest()[:8], 16)
+        rng = np.random.default_rng([seed, h])
+        # 不在 MOCK_FAST 的名字（--mock --fast a b c）也給一組確定的設定
+        shift, mult = spec.get(m, (-0.01 * (h % 9), 0.6 + (h % 11) / 10))
+        price, _ = fast_price(m)
+        new = cf.copy()
+        if shift:
+            for b in sorted(set(bench)):
+                idx = np.where(bench == b)[0]
+                pool = idx[cf[idx] == (1 if shift < 0 else 0)]
+                k = min(len(pool), int(round(abs(shift) * len(idx))))
+                if k:
+                    w = (p[pool] if shift < 0 else 1 - p[pool]) + 0.05
+                    new[rng.choice(pool, size=k, replace=False, p=w / w.sum())] = int(shift > 0)
+        rows = []
+        for r, c_new in zip(base, new):
+            tok = r["tok_fast"] if mult == 1.0 else int(r["tok_fast"] * mult * rng.lognormal(0, 0.2))
+            rows.append({**r, "fast_model": m, "c_fast": int(c_new), "tok_fast": tok,
+                         "cost_fast": _cost(tok * 0.35, tok * 0.65, price)})
+        out[m] = rows
+    return out
+
+
+def load_multi_fast(args):
+    """回傳 (要比的 fast, {fast: rows}, 覆蓋表或 None)。"""
+    base = load_joined(args)
+    if args.fast:
+        models = list(dict.fromkeys(args.fast))  # 去重、保留順序（顏色照這個順序配）
+    elif args.mock:
+        models = [m for m, _, _ in MOCK_FAST]
+    else:
+        models, partial = detect_fast_models(sorted({r["bench"] for r in base}))
+        print(f"\n沒給 --fast，自動找到 {len(models)} 個 fast：{' / '.join(models) or '（無）'}")
+        if partial:
+            print(f"  只有部分 bench 有作答、沒收進來：{' / '.join(partial)}"
+                  "（要比的話用 --fast 指定，交集會只剩它有答的 bench）")
+    if ROUTE_POWERFUL in models:
+        raise SystemExit(f"{ROUTE_POWERFUL} 是固定的 powerful，不能同時當 fast")
+    if not models:
+        raise SystemExit("沒有要比的 fast。先跑 python <bench>_routing.py answer --model <名稱>，"
+                         "或用 --fast 指定")
+    if len(models) > len(PALETTE["light"]["cat"]):
+        raise SystemExit(f"一次最多比 {len(PALETTE['light']['cat'])} 個 fast（顏色只有這麼多，"
+                         "不自動生成新色）；分兩批跑")
+    if args.mock:
+        return models, mock_multi_fast(base, models), None
+    rows_by, coverage = multi_fast_rows(base, models)
+    empty = [m for m in models if not any(got for got, _ in coverage[m].values())]
+    if empty:  # 名字打錯或還沒跑 answer：直接講清楚，不要只說「交集 0 題」
+        benches = sorted(coverage[empty[0]])
+        raise SystemExit(
+            f"找不到這些 fast 的有效作答：{' / '.join(empty)}\n"
+            f"  名字要和 <bench>/answers/<名稱>.jsonl 的檔名一樣，例如先跑：\n"
+            + "\n".join(f"    python {b}_routing.py answer --model {empty[0]}" for b in benches))
+    return models, rows_by, coverage
+
+
+def tau_point(a, tau=0.5):
+    """門檻 τ 在藍線上的作業點：k 題升級、呼叫比例、正確率、$、其中 +1 / −1 各幾題。"""
+    srt, r = a["sorted"], a["router"]
+    k = int((srt["p"] >= tau).sum())
+    d = srt["delta"][:k]
+    return {"k": k, "call": float(r["call"][k]), "acc": float(r["acc"][k]),
+            "cost": float(r["cost"][k]), "up": int((d > 0).sum()), "down": int((d < 0).sum())}
+
+
+def best_point(a):
+    """藍線上正確率最高的作業點（同分取呼叫比例最小的）。"""
+    r = a["router"]
+    k = int(np.argmax(r["acc"]))
+    return {"call": float(r["call"][k]), "acc": float(r["acc"][k]), "cost": float(r["cost"][k])}
+
+
+# ---- 主控台報表 ----
+def print_multi_fast(mm, models, coverage, args):
+    ref = mm[models[0]]["all"]
+    n = ref["n"]
+    t5 = tau_point(ref)
+    print(f"\n{'=' * 78}")
+    print(f"  model_route 多個 fast 的比較　N = {n}"
+          f"　（{'示意資料' if args.mock else '真實資料'}）")
+    print(f"  powerful = {ROUTE_POWERFUL}（固定）　router = {ROUTER_NAME}")
+    print(f"  fast = {' / '.join(models)}")
+    print(f"{'=' * 78}")
+    if PRICES_ARE_PLACEHOLDER:
+        print("\n  ⚠ PRICES 還是示意單價，所有 $ 的數字都不要引用（改 deep20_report.py 的 PRICES / FAST_PRICES）")
+    fallback = [m for m in models if fast_price(m)[1]]
+    if fallback:
+        print(f"  ⚠ 這些 fast 沒填單價，暫用 PRICES['fast']（{PRICES['fast']['in']:g} / "
+              f"{PRICES['fast']['out']:g}）：{' / '.join(fallback)}　→ 填進 FAST_PRICES")
+
+    if coverage:
+        benches = sorted({b for cov in coverage.values() for b in cov})
+        print("\n[覆蓋] 以 joined.jsonl 為基準，各 fast 有有效作答的題數（比較只用交集）")
+        print("  " + pad("fast", 22) + "".join(pad(b.upper(), 13, True) for b in benches))
+        print("  " + "-" * (22 + 13 * len(benches)))
+        for m in models:
+            print("  " + pad(m, 22) + "".join(
+                pad(f"{coverage[m][b][0]}/{coverage[m][b][1]}", 13, True) for b in benches))
+        common = Counter(mm[models[0]]["data"].bench.tolist())
+        print("  " + pad("交集", 22) + "".join(pad(common.get(b, 0), 13, True) for b in benches))
+        dropped = [b.upper() for b in benches if not common.get(b)]
+        if dropped:
+            print(f"  ⚠ 交集是 0 題的 bench 這次整個不比：{' / '.join(dropped)}")
+        for m in models:
+            for b in benches:
+                got, tot = coverage[m][b]
+                if got < tot:
+                    print(f"  缺 {tot - got} 題 → python {b}_routing.py answer --model {m}")
+
+    print(f"\n  route_p 和 fast 是誰無關：τ = 0.5 時每個 fast 都升級同樣的 {t5['k']} 題"
+          f"（{pct(t5['call'])}）；全送 powerful 一律 {pct(ref['acc_pow'])}"
+          f"、${ref['cost_pow'] * 1000:,.2f}/千題")
+
+    # ---- 表 M1：正確率 ----
+    print("\n[表 M1] 正確率（合計）")
+    cols = [("fast", 22, False), ("全送 fast", 11, True), ("τ=0.5", 9, True),
+            ("+1/−1", 10, True), ("最高正確率", 12, True), ("在呼叫比例", 12, True),
+            ("天花板", 9, True),
+            ("轉折", 8, True), ("APGR", 7, True), ("CPT95", 8, True)]
+    print("  " + "".join(pad(c_, w, r_) for c_, w, r_ in cols))
+    print("  " + "-" * sum(w for _, w, _ in cols))
+    for m in models:
+        a = mm[m]["all"]
+        tp, bp = tau_point(a), best_point(a)
+        vals = [m, pct(a["acc_fast"]), pct(tp["acc"]), f"{tp['up']}/{tp['down']}", pct(bp["acc"]),
+                pct(bp["call"], 0), pct(a["ceiling"]), pct(a["knee"]), f"{a['apgr']:.2f}",
+                pct(a["cpt"][0.95])]
+        print("  " + "".join(pad(v, w, r_) for v, (_, w, r_) in zip(vals, cols)))
+
+    # ---- 表 M2：花費 ----
+    print("\n[表 M2] $/千題（合計，只計模型花費）")
+    cols = [("fast", 22, False), ("單價 in/out", 14, True), ("全送 fast", 11, True),
+            ("τ=0.5", 10, True), ("最高正確率", 12, True), ("全送 powerful", 15, True)]
+    print("  " + "".join(pad(c_, w, r_) for c_, w, r_ in cols))
+    print("  " + "-" * sum(w for _, w, _ in cols))
+    for m in models:
+        a = mm[m]["all"]
+        price, fb = fast_price(m)
+        vals = [m, f"{price['in']:g}/{price['out']:g}" + ("*" if fb else ""),
+                f"${a['cost_fast'] * 1000:,.2f}", f"${tau_point(a)['cost'] * 1000:,.2f}",
+                f"${best_point(a)['cost'] * 1000:,.2f}", f"${a['cost_pow'] * 1000:,.2f}"]
+        print("  " + "".join(pad(v, w, r_) for v, (_, w, r_) in zip(vals, cols)))
+    if fallback:
+        print("  * 沒填單價，暫用 PRICES['fast']")
+
+    # ---- 表 M3：2×2，合計與各 bench ----
+    print("\n[表 M3] 每個 fast 和 powerful 的能力重疊（升級賺分 = 只有 powerful 對、掉分 = 只有 fast 對）")
+    cols = [("fast", 22, False), ("n", 6, True), ("兩個都對", 10, True), ("只有fast對", 12, True),
+            ("只有powerful對", 16, True), ("兩個都錯", 10, True), ("淨益", 9, True)]
+    scopes = [("合計", "all")] + [(b.upper(), b) for b in mm[models[0]]["bench"]]
+    for label, key in scopes:
+        print(f"\n  ── {label}")
+        print("  " + "".join(pad(c_, w, r_) for c_, w, r_ in cols))
+        for m in models:
+            a = mm[m]["all"] if key == "all" else mm[m]["bench"][key]
+            q = a["quad"]
+            vals = [m, q["n"], q["both"], q["fast_only"], q["pow_only"], q["none"], f"{q['net']:+.1%}"]
+            print("  " + "".join(pad(v, w, r_) for v, (_, w, r_) in zip(vals, cols)))
+
+    # ---- 表 M4：各 bench 的正確率 ----
+    print("\n[表 M4] 各 bench：全送 fast → τ=0.5 → 天花板（全送 powerful 每個 fast 都一樣）")
+    cols = [("fast", 22, False), ("全送 fast", 11, True), ("τ=0.5", 9, True), ("天花板", 9, True),
+            ("APGR", 7, True)]
+    for b in mm[models[0]]["bench"]:
+        rb = mm[models[0]]["bench"][b]
+        print(f"\n  ── {b.upper()}　n = {rb['n']}　全送 powerful {pct(rb['acc_pow'])}"
+              f"　τ=0.5 升級 {tau_point(rb)['k']} 題")
+        print("  " + "".join(pad(c_, w, r_) for c_, w, r_ in cols))
+        for m in models:
+            a = mm[m]["bench"][b]
+            vals = [m, pct(a["acc_fast"]), pct(tau_point(a)["acc"]), pct(a["ceiling"]),
+                    f"{a['apgr']:.2f}"]
+            print("  " + "".join(pad(v, w, r_) for v, (_, w, r_) in zip(vals, cols)))
+
+
+# ---- 圖 ----
+def fast_colors(models, c):
+    """顏色跟著 --fast 給的順序固定配，不按排名：同一個 fast 在每張圖都是同一個顏色。"""
+    return {m: c["cat"][i] for i, m in enumerate(models)}
+
+
+def _gutter(models):
+    """左端點標籤要用的空間（資料座標）：照最長的名字估。"""
+    return -min(0.42, max(0.16, 0.045 + 0.0105 * max(len(m) for m in models)))
+
+
+def _label_left_ends(ax, ma, models, c, lo, hi):
+    """每個 fast 的左端點旁標「名字 + 全送 fast 正確率」，靠得太近時往上推開、拉一條引線。"""
+    gap = (hi - lo) * 0.075
+    placed = []
+    for y, m in sorted((ma[m]["acc_fast"], m) for m in models):
+        placed.append([max(y, placed[-1][0] + gap) if placed else y, m, y])
+    over = placed[-1][0] - (hi - gap / 2)
+    if over > 0:
+        for p_ in placed:
+            p_[0] -= over
+    for y_lab, m, y in placed:
+        ax.text(-0.04, y_lab, f"{m}\n{ma[m]['acc_fast']:.1%}", ha="right", va="center",
+                fontsize=8, color=c["ink2"], linespacing=1.15, zorder=8)
+        if abs(y_lab - y) > 1e-9:
+            ax.plot([-0.035, -0.014], [y_lab, y], color=c["muted"], lw=0.7, zorder=4)
+
+
+def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True):
+    """多個 fast 的藍線疊在同一張圖上。ma = {fast: analyse()}，必須是同一組題目。
+
+    粗線 = 該 fast 的 router 曲線，同色細線 = 該 fast 的 oracle，右端黑點 = 全送 powerful（共用）。
+    回傳 (Y 下限, Y 上限, 上方 τ 軸或 None)。
+    """
+    style_axes(ax, c)
+    col = fast_colors(models, c)
+    ref = ma[models[0]]
+    for m in models:
+        a = ma[m]
+        ax.plot(a["oracle"]["call"], a["oracle"]["acc"], color=col[m], lw=1.1, alpha=0.5, zorder=2)
+        ax.plot(a["router"]["call"], a["router"]["acc"], color=col[m], lw=2.0, zorder=3)
+        ax.plot([0], [a["acc_fast"]], "o", ms=8, color=col[m], zorder=5,
+                markeredgecolor=c["surface"], markeredgewidth=2)
+    ax.plot([1], [ref["acc_pow"]], "o", ms=8, color=c["ink"], zorder=6,
+            markeredgecolor=c["surface"], markeredgewidth=2)
+
+    lo = min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values()) - 0.03
+    ceil = max(a["ceiling"] for a in ma.values())
+    # 上方留白跟著跨距放大（AIME 跨 50 分以上時，③ 的標記才不會頂到上方的 τ 刻度）
+    hi = min(ceil + max(0.02, 0.07 * (ceil - lo)), max(1.0, ceil + 0.005))
+    ax.set_xlim(_gutter(models) if labels else -0.02, 1.02)
+    ax.set_ylim(lo, hi)
+    pct_axis(ax.yaxis)
+    ax.set_xticks(np.linspace(0, 1, 6))
+    ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    ax.set_xlabel("powerful call rate k / N (same for every fast model)", color=c["ink2"])
+    ax.set_ylabel("end-to-end accuracy", color=c["ink2"])
+    if labels:
+        _label_left_ends(ax, ma, models, c, lo, hi)
+    axt = draw_tau_axis(ax, ref, c) if tau else None
+    return lo, hi, axt
+
+
+def _cmp_legend(target, models, c, oracle=True, extra=(), **kw):
+    """圖例：第一列各 fast（照配色順序），第二列 oracle / 全送 powerful 這些共用的說明。
+
+    matplotlib 的圖例是一欄一欄往下填的，所以把兩列交錯排好再交給它。
+    fast 超過 4 個時一列放不下，改成三欄照順序排。
+    """
+    import matplotlib.pyplot as plt
+    col = fast_colors(models, c)
+    fast_h = [plt.Line2D([], [], color=col[m], lw=2.0, label=f"fast = {m}") for m in models]
+    ref_h = []
+    if oracle:
+        ref_h.append(plt.Line2D([], [], color=c["muted"], lw=1.1, alpha=0.7,
+                                label=t("同色細線 = 該 fast 的 oracle", "thin = that fast's oracle")))
+    ref_h.append(plt.Line2D([], [], color=c["ink"], marker="o", ls="", ms=7,
+                            label=t(f"全送 powerful（{ROUTE_POWERFUL}）",
+                                    f"all powerful ({ROUTE_POWERFUL})")))
+    ref_h += list(extra)
+    if len(models) <= 4 and len(ref_h) <= len(models):
+        ncols = len(models)
+        handles = [h for i in range(ncols) for h in (fast_h[i:i + 1] + ref_h[i:i + 1])]
+    else:
+        ncols = 3
+        handles = fast_h + ref_h
+    return target.legend(handles=handles, ncols=ncols, labelcolor=c["ink2"], **kw)
+
+
+def fig_multi_curve(ma, models, c, path, title=None):
+    """多 fast 圖 1：X = 呼叫比例（每個 fast 共用），上方 τ，Y = end-to-end 正確率。"""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8.8, 5.6))
+    _cmp_curve_axes(ax, ma, models, c)
+    if title:
+        ax.set_title(title, color=c["ink"], fontsize=11, loc="left", pad=22)
+    _cmp_legend(ax, models, c, loc="upper center", bbox_to_anchor=(0.5, -0.13), fontsize=8.5)
+    _save(fig, path, c)
+
+
+def fig_multi_cost(ma, models, c, path, title=None):
+    """多 fast 圖 2：X 換成 $ 每千題。每個 fast 的 token 用量和單價不同，$ 不能共用一條呼叫比例軸。
+
+    每條線從「全送該 fast」走到「全送 powerful」（共用的黑點），○ 是 τ = 0.5 的作業點。
+    """
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8.8, 5.6))
+    style_axes(ax, c)
+    col = fast_colors(models, c)
+    ref = ma[models[0]]
+    label_bg = dict(boxstyle="square,pad=0.15", fc=c["surface"], ec="none", alpha=0.85)
+    for m in models:
+        a = ma[m]
+        r = a["router"]
+        x = r["cost"] * 1000
+        ax.plot(x, r["acc"], color=col[m], lw=2.0, zorder=3)
+        ax.plot([x[0]], [r["acc"][0]], "o", ms=8, color=col[m], zorder=5,
+                markeredgecolor=c["surface"], markeredgewidth=2)
+        tp = tau_point(a)
+        ax.plot([tp["cost"] * 1000], [tp["acc"]], "o", ms=9, markerfacecolor=c["surface"],
+                markeredgecolor=col[m], markeredgewidth=1.8, zorder=6)
+        ax.annotate(f"{m}\n${x[0]:,.2f}", (x[0], r["acc"][0]), textcoords="offset points",
+                    xytext=(0, -10), ha="center", va="top", fontsize=8, color=c["ink2"],
+                    linespacing=1.15, zorder=8, bbox=label_bg)
+    xp = ref["cost_pow"] * 1000
+    ax.plot([xp], [ref["acc_pow"]], "o", ms=8, color=c["ink"], zorder=7,
+            markeredgecolor=c["surface"], markeredgewidth=2)
+    ax.annotate(t(f"全送 powerful\n${xp:,.2f}", f"all powerful\n${xp:,.2f}"), (xp, ref["acc_pow"]),
+                textcoords="offset points", xytext=(0, -10), ha="center", va="top",
+                fontsize=8, color=c["ink2"], linespacing=1.15, zorder=8, bbox=label_bg)
+    pct_axis(ax.yaxis)
+    ax.xaxis.set_major_formatter(lambda v, _: f"${v:,.2f}")
+    ax.margins(x=0.08, y=0.12)
+    ax.set_xlabel("$ per 1k items (model cost only, excl. guard)", color=c["ink2"])
+    ax.set_ylabel("end-to-end accuracy", color=c["ink2"])
+    if title:
+        ax.set_title(title, color=c["ink"], fontsize=11, loc="left", pad=8)
+    tau_h = plt.Line2D([], [], marker="o", ls="", ms=8, markerfacecolor=c["surface"],
+                       markeredgecolor=c["ink2"], markeredgewidth=1.6,
+                       label=t("τ = 0.5 的作業點", "τ = 0.5 operating point"))
+    _cmp_legend(ax, models, c, oracle=False, extra=[tau_h],  # 這張沒畫 oracle
+                loc="upper center", bbox_to_anchor=(0.5, -0.12), fontsize=8.5)
+    _save(fig, path, c)
+
+
+def fig_multi_per_bench(mb, models, c, path):
+    """多 fast 圖 3：每個 bench 一格，格內疊所有 fast。Y 軸各格自己放大（跨距寫在標題）。"""
+    import matplotlib.pyplot as plt
+    names = list(mb)
+    ncols = 2 if len(names) > 1 else 1
+    nrows = math.ceil(len(names) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(9.4, 3.4 * nrows + 0.4), squeeze=False)
+    for ax in axes.ravel()[len(names):]:
+        ax.set_visible(False)
+    for ax, name in zip(axes.ravel(), names):
+        ma = mb[name]
+        ref = ma[models[0]]
+        _cmp_curve_axes(ax, ma, models, c, labels=False, tau=False)
+        lo_d = min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values())
+        hi_d = max(max(a["ceiling"], a["router"]["acc"].max()) for a in ma.values())
+        pad_ = max((hi_d - lo_d) * 0.125, 0.002)
+        lo, hi = max(0.0, lo_d - pad_), hi_d + pad_
+        if hi_d < 1.0:
+            hi = min(hi, 1.0)
+        ax.set_ylim(lo, hi)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_title(f"{name.upper()}　n = {ref['n']}　(Y span {hi - lo:.1%}, 1 item = {1 / ref['n']:.2%})",
+                     color=c["ink"], fontsize=10, loc="left", pad=26)
+        small_tau_axis(ax, ref, c)
+    _cmp_legend(fig, models, c, loc="lower center", fontsize=9, bbox_to_anchor=(0.5, -0.06))
+    fig.tight_layout(rect=(0, 0.02, 1, 1))
+    _save(fig, path, c)
+
+
+# ---- 說明版 ----
+def _multi_explained_chart(ax, ma, models, c):
+    """說明版左邊的圖：多 fast 疊圖 + ①–④ 的標記 + τ = 0.5 的讀圖路徑。"""
+    col = fast_colors(models, c)
+    ref = ma[models[0]]
+    lo, hi, axt = _cmp_curve_axes(ax, ma, models, c)
+    ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（每個 fast 都一樣）", color=c["ink2"])
+    ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
+    axt.set_xlabel("上方 X 軸：門檻 τ（route_p ≥ τ 的題目送 powerful，和 fast 是誰無關）",
+                   color=c["ink2"], labelpad=6)
+
+    def badge(x, y, num, dx, dy):
+        ax.annotate(str(num), (x, y), xytext=(dx, dy), textcoords="offset points",
+                    ha="center", va="center", color=c["ink"], fontsize=10, zorder=9,
+                    bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
+                    arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
+
+    # ① 左端點（指最低那個，其他的旁邊有名字）② 共用的右端黑點
+    low = min(models, key=lambda m: ma[m]["acc_fast"])
+    badge(0, ma[low]["acc_fast"], 1, 24, -22)
+    badge(1, ref["acc_pow"], 2, -22, -24)
+    # ③ 每條 oracle 的轉折點
+    for m in models:
+        ax.plot([ma[m]["knee"]], [ma[m]["ceiling"]], "o", ms=6, color=col[m],
+                markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=6)
+    top = max(models, key=lambda m: ma[m]["ceiling"])
+    badge(ma[top]["knee"], ma[top]["ceiling"], 3, 18, 16)
+    # ④ τ = 0.5：從上方刻度往下，和每條線各交一點
+    tp = tau_point(ref)
+    x5 = tp["call"]
+    ax.plot([x5, x5], [hi, lo], color=c["ink2"], lw=0.9, ls=(0, (1.5, 2.5)), zorder=2)
+    ys = []
+    for m in models:
+        y5 = tau_point(ma[m])["acc"]
+        ys.append(y5)
+        ax.plot([x5], [y5], "o", ms=10, markerfacecolor="none", markeredgecolor=col[m],
+                markeredgewidth=1.6, zorder=7)
+    badge(x5, max(ys), 4, 20, 18)
+
+    _cmp_legend(ax, models, c, loc="upper center", bbox_to_anchor=(0.5, -0.11), fontsize=9)
+
+
+def _multi_explained_lines(ma, models):
+    """說明版右邊的逐項推導：[(縮排, 內容, 樣式)]。樣式 h / b / m 同 _explained_lines；
+    t 是表格，內容是 (欄位置, 列…)，每列第一格是 fast 名字（畫的時候前面加該 fast 的色塊）。
+    """
+    ref = ma[models[0]]
+    n, tp0 = ref["n"], tau_point(ref)
+    pct1 = lambda v: f"{v:.1%}"
+    n_pow = ref["quad"]["both"] + ref["quad"]["pow_only"]
+    t1 = ((0.035, 0.30, 0.45, 0.61, 0.82),
+          ("fast", "兩個都對", "只有 fast 對", "只有 powerful 對", "兩個都錯"),
+          *[(m, ma[m]["quad"]["both"], ma[m]["quad"]["fast_only"], ma[m]["quad"]["pow_only"],
+             ma[m]["quad"]["none"]) for m in models])
+    rows2 = []
+    for m in models:
+        a, tp = ma[m], tau_point(ma[m])
+        rows2.append((m, pct1(a["acc_fast"]), pct1(a["ceiling"]), pct1(a["knee"]),
+                      f"{tp['up']} / {tp['down']}", pct1(tp["acc"]), f"${tp['cost'] * 1000:,.2f}"))
+    t2 = ((0.035, 0.28, 0.40, 0.51, 0.62, 0.75, 0.87),
+          ("fast", "① 全送 fast", "③ 天花板", "③ 轉折", "④ +1 / -1", "④ 正確率", "④ $/千題"),
+          *rows2)
+    lines = [
+        (0, f"powerful = {ROUTE_POWERFUL}（固定）　router = {ROUTER_NAME}　fast 比 {len(models)} 個", "m"),
+        (0, f"N = {n} 題：每個 fast 和 powerful 都有有效作答的交集", "m"),
+        (0, "每個 fast 和 powerful 對 N 題各答一次的結果", "h"),
+        (0, t1, "t"),
+        (0, "圖上 1–4 的數字怎麼來", "h"),
+        (0, "① 各色左端點 = 全送該 fast =（兩個都對 + 只有 fast 對）/ N", "b"),
+        (0, f"② 右端黑點 = 全送 powerful =（兩個都對 + 只有 powerful 對）/ N = {n_pow} / {n}"
+            f" = {pct1(ref['acc_pow'])}", "b"),
+        (1, "這兩格加起來就是 powerful 答對的題數，和 fast 是誰無關，所以只有一個黑點", "b"),
+        (0, "③ 同色細線 = 該 fast 的 oracle：事先知道答案，先升級「只有 powerful 對」的題目", "b"),
+        (1, "轉折 = 只有 powerful 對 / N，天花板 = (N - 兩個都錯) / N", "b"),
+        (0, f"④ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
+            f" = {pct1(tp0['call'])}，每個 fast 都升級這 {tp0['k']} 題", "b"),
+        (1, "正確率 = ① + (+1 題數 - -1 題數) / N；$ = (這幾題 powerful + 其餘 fast) / N × 1000", "b"),
+        (0, t2, "t"),
+        (0, "為什麼每個 fast 共用同一條 X 軸", "h"),
+        (0, f"route_p 是 {ROUTER_NAME} 只看題目給的，它看不到 fast 是哪個 model", "b"),
+        (1, "→ 升級順序、上方 τ 刻度、下方呼叫比例，對每個 fast 都一樣", "b"),
+        (1, "換 fast 只改變每一階是 +1、0 還是 -1（y_P - y_F），各色線因此分開", "b"),
+        (1, "$ 不能共用：每個 fast 的 token 用量和單價不同 → X 換成 $ 的那張是 cost.png", "b"),
+        (0, "單價（$ / 百萬 token，輸入 / 輸出）與全送時的 $ 每千題", "h"),
+    ]
+    for m in models:
+        price, fb = fast_price(m)
+        lines.append((0, f"fast {m}　{price['in']:g} / {price['out']:g}　${ma[m]['cost_fast'] * 1000:,.2f}"
+                         + ("（沒填，暫用 PRICES['fast']）" if fb else ""), "b"))
+    lines += [
+        (0, f"powerful {ROUTE_POWERFUL}　{PRICES['powerful']['in']:g} / {PRICES['powerful']['out']:g}"
+            f"　${ref['cost_pow'] * 1000:,.2f}；不含守門開銷", "b"),
+        (0, "怎麼讀", "h"),
+        (0, "上方選一個 τ → 往下對到各色線 → 同一個 τ 下線越高，那個 fast 越好（④ 的點線就是一例）", "b"),
+    ]
+    if PRICES_ARE_PLACEHOLDER:
+        lines.append((0, "注意：PRICES 還是示意單價，所有 $ 的數字都不能引用", "b"))
+    return lines
+
+
+def _draw_multi_lines(ax_t, lines, models, c):
+    """把 _multi_explained_lines 畫在右半邊。行數隨 fast 個數變多，行距跟著縮，不會超出版面。"""
+    col = fast_colors(models, c)
+    units = sum(1.7 if s == "h" else (len(x) - 1) if s == "t" else 1 for _, x, s in lines)
+    step = min(0.0262, 0.98 / units)
+    y = 1.0
+    for indent, x, style in lines:
+        if style == "h":
+            y -= step * 0.55
+            ax_t.text(0, y, x.replace("$", r"\$"), transform=ax_t.transAxes, va="top",
+                      color=c["ink"], fontsize=11.5)
+            y -= step * 1.15
+            continue
+        if style == "t":
+            xs, *rows = x
+            for i, row in enumerate(rows):
+                if i and row[0] in col:  # 色塊：表格的 fast 名字和圖上的線對得起來
+                    ax_t.plot([0.012], [y - i * step - step * 0.38], "s", ms=7, color=col[row[0]],
+                              transform=ax_t.transAxes, clip_on=False)
+                for xx, cell in zip(xs, row):
+                    ax_t.text(xx, y - i * step, str(cell).replace("$", r"\$"),
+                              transform=ax_t.transAxes, va="top", fontsize=9.6 if i else 9,
+                              color=c["ink"] if i else c["ink2"])
+            y -= step * len(rows)
+            continue
+        ax_t.text(0.03 * indent, y, x.replace("$", r"\$"), transform=ax_t.transAxes, va="top",
+                  fontsize=9.6, color=c["muted"] if style == "m" else c["ink"])
+        y -= step
+
+
+def fig_multi_explained(ma, models, c, path, name):
+    """多 fast 的說明版：左邊疊圖標 ①–④，右邊逐項寫出每個 fast 的數字怎麼算。"""
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(17.5, 9.8))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.18, 1], wspace=0.05,
+                          left=0.05, right=0.99, top=0.88, bottom=0.16)
+    ax, ax_t = fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
+    _multi_explained_chart(ax, ma, models, c)
+    fig.suptitle(f"{name}　N = {ma[models[0]]['n']}　多個 fast 怎麼讀這張圖", x=0.05, y=0.975,
+                 ha="left", color=c["ink"], fontsize=15)
+    ax_t.axis("off")
+    _draw_multi_lines(ax_t, _multi_explained_lines(ma, models), models, c)
+    _save(fig, path, c)
+
+
+def fig_multi_explained_split(ma, models, c, png_path, txt_path, name):
+    """說明版拆成「只有圖」的 PNG 和「只有文字」的 .txt（表格用 Tab 分欄），給投影片用。"""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(10.5, 6.8))
+    _multi_explained_chart(ax, ma, models, c)
+    ax.set_title(f"{name}　N = {ma[models[0]]['n']}", color=c["ink"], fontsize=11, loc="left", pad=34)
+    _save(fig, png_path, c)
+
+    out = [f"{name}　N = {ma[models[0]]['n']}　多個 fast 怎麼讀這張圖"]
+    for indent, x, style in _multi_explained_lines(ma, models):
+        if style == "h":
+            out += ["", x]
+        elif style == "t":
+            out += ["\t".join(str(cell) for cell in row) for row in x[1:]]
+        else:
+            out.append("　　" * indent + x)
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
+    print(f"  → {os.path.relpath(txt_path, HERE)}")
+
+
+# ---- Excel ----
+def write_excel_multi(mm, models, coverage, path, args):
+    import pandas as pd
+    ref = mm[models[0]]
+    scopes = [("合計", None)] + [(b.upper(), b) for b in ref["bench"]]
+
+    summary = []
+    for label, key in scopes:
+        for m in models:
+            a = mm[m]["all"] if key is None else mm[m]["bench"][key]
+            tp, bp, q = tau_point(a), best_point(a), a["quad"]
+            summary.append({
+                "範圍": label, "fast": m, "n": a["n"],
+                "全送 fast 正確率": a["acc_fast"], "全送 powerful 正確率": a["acc_pow"],
+                "oracle 天花板": a["ceiling"], "oracle 轉折點": a["knee"],
+                "τ=0.5 呼叫比例": tp["call"], "τ=0.5 正確率": tp["acc"], "τ=0.5 $/千題": tp["cost"] * 1000,
+                "τ=0.5 +1 題數": tp["up"], "τ=0.5 -1 題數": tp["down"],
+                "現行 argmax 正確率": a["star"]["acc"],
+                "最高正確率": bp["acc"], "最高正確率的呼叫比例": bp["call"],
+                "最高正確率的 $/千題": bp["cost"] * 1000,
+                "APGR": a["apgr"], "CPT(95%)": a["cpt"][0.95], "AUROC": a["auroc"],
+                "全送 fast $/千題": a["cost_fast"] * 1000, "全送 powerful $/千題": a["cost_pow"] * 1000,
+                "兩個都對": q["both"], "只有 fast 對": q["fast_only"],
+                "只有 powerful 對": q["pow_only"], "兩個都錯": q["none"], "淨益": q["net"],
+            })
+
+    curves = []
+    for m in models:
+        a = mm[m]["all"]
+        r = a["router"]
+        step = max(1, len(r["call"]) // 400)
+        for i in range(0, len(r["call"]), step):
+            curves.append({"fast": m, "門檻 τ": r["tau"][i], "powerful 呼叫比例": r["call"][i],
+                           "end-to-end 正確率": r["acc"][i], "$/千題": r["cost"][i] * 1000,
+                           "oracle 正確率": a["oracle"]["acc"][i]})
+
+    meta = [
+        {"項目": "資料來源", "值": "示意資料（--mock）" if args.mock else
+         f"{os.path.join(args.out, JOINED)} + <bench>/answers/<fast>.jsonl"},
+        {"項目": "題數 N（交集）", "值": ref["all"]["n"]},
+        {"項目": "powerful model（固定）", "值": ROUTE_POWERFUL},
+        {"項目": "router", "值": ROUTER_NAME},
+        {"項目": "fast models（顏色順序）", "值": " / ".join(models)},
+        {"項目": "powerful 單價 $/1M（in / out）",
+         "值": f"{PRICES['powerful']['in']} / {PRICES['powerful']['out']}"},
+    ]
+    for m in models:
+        price, fb = fast_price(m)
+        meta.append({"項目": f"{m} 單價 $/1M（in / out）",
+                     "值": f"{price['in']} / {price['out']}" + ("（沒填，暫用 PRICES['fast']）" if fb else "")})
+    meta += [
+        {"項目": "單價是否為示意值", "值": "是（務必替換）" if PRICES_ARE_PLACEHOLDER else "否"},
+        {"項目": "升級順序", "值": "route_p 由大到小；router 看不到 model 身分，所以每個 fast 都一樣"},
+        {"項目": "gold 定義", "值": "每個 fast 各自算：fast 答對 → fast；fast 錯而 powerful 對 → powerful；都錯 → none"},
+    ]
+
+    base_cols = ["bench", "qid", "route_p", "route", "route_conf", "guard", "c_pow", "tok_pow", "cost_pow"]
+    items = pd.DataFrame([{k: r.get(k) for k in base_cols} for r in ref["data"].rows])
+    for m in models:
+        rows = mm[m]["data"].rows
+        items[f"c_fast[{m}]"] = [r["c_fast"] for r in rows]
+        items[f"tok_fast[{m}]"] = [r["tok_fast"] for r in rows]
+        items[f"cost_fast[{m}]"] = [r["cost_fast"] for r in rows]
+
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        pd.DataFrame(summary).to_excel(xw, sheet_name="摘要_fast比較", index=False)
+        if coverage:
+            benches = sorted({b for cov in coverage.values() for b in cov})
+            pd.DataFrame([{"fast": m, **{f"{b.upper()} 有效作答": coverage[m][b][0] for b in benches},
+                           **{f"{b.upper()} 題數": coverage[m][b][1] for b in benches}}
+                          for m in models]).to_excel(xw, sheet_name="作答覆蓋", index=False)
+        pd.DataFrame(curves).to_excel(xw, sheet_name="曲線原始值", index=False)
+        pd.DataFrame(meta).to_excel(xw, sheet_name="方法參數", index=False)
+        items.to_excel(xw, sheet_name="逐題資料", index=False)
+    print(f"  → {os.path.relpath(path, HERE)}")
+
+
+# ---- 子命令 ----
+def cmd_report_multi_fast(args):
+    out = os.path.join(args.out, MULTI_FAST_DIR)
+    os.makedirs(out, exist_ok=True)
+    models, rows_by, coverage = load_multi_fast(args)
+    n = len(rows_by[models[0]])
+    if n < 10:
+        raise SystemExit(f"每個 fast 都有作答的交集只有 {n} 題，畫不出有意義的曲線"
+                         "（看上面的 [覆蓋] 缺什麼，或少比幾個 fast）")
+
+    print(f"\n分析 {n} 題 × {len(models)} 個 fast…", flush=True)
+    mm = {}
+    for m in models:
+        data = Data(rows_by[m])
+        mm[m] = {"data": data, "all": analyse(data, 0), "bench": per_bench_analyses(data, 0)}
+    print_multi_fast(mm, models, coverage, args)
+
+    font = setup_font()
+    print(f"\n畫圖（字型 {font or 'DejaVu Sans（沒有 CJK 字型，標籤改用英文）'}）→ "
+          f"{os.path.relpath(out, HERE)}/")
+    c = PALETTE["dark" if args.dark else "light"]
+    sfx = "_dark" if args.dark else ""
+    overall = {m: mm[m]["all"] for m in models}
+    by_bench = {b: {m: mm[m]["bench"][b] for m in models} for b in mm[models[0]]["bench"]}
+
+    fig_multi_curve(overall, models, c, os.path.join(out, f"curve_tau_axis{sfx}.png"))
+    fig_multi_cost(overall, models, c, os.path.join(out, f"cost{sfx}.png"))
+    fig_multi_per_bench(by_bench, models, c, os.path.join(out, f"per_bench_tau_axis{sfx}.png"))
+    for b, ma in by_bench.items():
+        fig_multi_curve(ma, models, c, os.path.join(out, f"curve_tau_axis_{b}{sfx}.png"),
+                        title=f"{b.upper()}　n = {ma[models[0]]['n']}")
+        fig_multi_cost(ma, models, c, os.path.join(out, f"cost_{b}{sfx}.png"),
+                       title=f"{b.upper()}　n = {ma[models[0]]['n']}")
+    if ZH:
+        for key, ma, label in [("", overall, "合計")] + [
+                (f"_{b}", ma, b.upper()) for b, ma in by_bench.items()]:
+            base = os.path.join(out, f"curve_tau_axis{key}_explained")
+            fig_multi_explained(ma, models, c, f"{base}{sfx}.png", label)
+            fig_multi_explained_split(ma, models, c, f"{base}_chart{sfx}.png", f"{base}.txt", label)
+    else:
+        print("  [skip] curve_tau_axis_*_explained：找不到中文字型")
+
+    print("\n寫 Excel")
+    write_excel_multi(mm, models, coverage, os.path.join(out, "tables.xlsx"), args)
+
+    # 每個 fast 各一份單一 fast 的圖（和 report 的同名檔一樣），放在 multi_fast/<fast>/
+    if args.per_fast != "none":
+        for m in models:
+            sub = os.path.join(out, safe_name(m))
+            os.makedirs(sub, exist_ok=True)
+            print(f"\n[{m}] 單一 fast 的圖 → {os.path.relpath(sub, HERE)}/")
+            with as_fast_model(m):
+                if args.per_fast == "explained":
+                    fig1_tau_axis_set(mm[m]["all"], mm[m]["bench"], c, sub, sfx)
+                else:  # full：和 report 完全同一套（主控台報表、全部的圖、tables.xlsx）
+                    sub_args = argparse.Namespace(**{
+                        **vars(args), "out": sub, "tau": "all", "with_band": False,
+                        "with_random": False, "appendix_b": False, "boot": 0,
+                        "source": None if args.mock else
+                        f"{os.path.join(args.out, JOINED)} + <bench>/answers/{m}.jsonl"})
+                    render_report(mm[m]["data"], sub_args, sub)
+    print(f"\n完成 → {os.path.relpath(out, HERE)}/\n")
 
 
 def main():
@@ -1848,6 +2681,20 @@ def main():
     p_rep.add_argument("--boot", type=int, default=None,
                        help="bootstrap 次數（預設：有 --with-band 時 1000，否則 0）")
     p_rep.set_defaults(func=cmd_report)
+
+    p_mf = sub.add_parser("report_muli_fast", aliases=["report_multi_fast"],
+                          help=f"powerful 固定（{ROUTE_POWERFUL}）、比好幾個 fast：疊圖、說明版、Excel")
+    common(p_mf)
+    p_mf.add_argument("--fast", nargs="+", metavar="MODEL",
+                      help="要比的 fast（= <bench>/answers/<MODEL>.jsonl 的檔名），依序配色；"
+                           "不給就自動找每個 bench 都有作答檔的 model")
+    p_mf.add_argument("--mock", action="store_true", help="用示意資料跑（沒有真資料時先看版面）")
+    p_mf.add_argument("--dark", action="store_true", help="輸出深色版 PNG（檔名加 _dark，不覆蓋淺色）")
+    p_mf.add_argument("--per-fast", choices=("explained", "full", "none"), default="explained",
+                      help="每個 fast 另外出一份單一 fast 的圖到 multi_fast/<fast>/："
+                           "explained = fig1_main_tau_axis 與說明版（預設）、"
+                           "full = 和 report 完全一樣的整套、none = 不出")
+    p_mf.set_defaults(func=cmd_report_multi_fast)
 
     p_st = sub.add_parser("status", help="看資料齊不齊、缺的要跑什麼")
     common(p_st)
