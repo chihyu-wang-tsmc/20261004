@@ -893,8 +893,11 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     _save(fig, path, c)
 
 
-def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
-    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。"""
+def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None, zero=False):
+    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。
+
+    zero=True 時 Y 軸從 0% 開始：說明版的 ④ 要從 0 量天花板的高度。fig1_main 不用，看得到細節。
+    """
     style_axes(ax, c)
     r, o, d, s = a["router"], a["oracle"], a["random"], a["star"]
     axt = None
@@ -917,9 +920,11 @@ def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
     # 圖面只留資料：★ 記號、四組文字標註、CPT 的引線與標籤、標題、頁尾說明全部不畫。
     # 這些數字沒有消失，它們在主控台報表的表 1 和 tables.xlsx 裡。
     ax.set_xlim(-0.02, 1.02)
-    lo = min(a["acc_fast"], r["acc"].min()) - 0.03
-    # 上限不超過 100%（正確率不會超過）；天花板剛好是 100% 時留一點邊，線才不會貼在框上
-    hi = min(a["ceiling"] + 0.02, max(1.0, a["ceiling"] + 0.005))
+    lo = 0.0 if zero else min(a["acc_fast"], r["acc"].min()) - 0.03
+    # 上限不超過 100%（正確率不會超過）；天花板剛好是 100% 時留一點邊，線才不會貼在框上。
+    # 從 0 開始時跨距大，上方留白跟著放大，③ 的標記才不會頂到上方的 τ 刻度
+    head = max(0.02, 0.07 * (a["ceiling"] - lo)) if zero else 0.02
+    hi = min(a["ceiling"] + head, max(1.0, a["ceiling"] + 0.005))
     ax.set_ylim(lo, hi)
     pct_axis(ax.yaxis)
 
@@ -949,13 +954,14 @@ def _explained_chart(ax, a, c, drops):
     """說明版左邊的圖：圖 1（上方標 τ）加上 1–6 的標記、τ = 0.5 的讀圖路徑、往下掉的階（▼）。
 
     fig1_explained（圖文合一）和 fig1_explained_split（只有圖）共用。回傳有沒有標 ▼。
+    Y 軸從 0% 開始：④ 量的是天花板的「高度」，箭頭要從 0 畫起才是真的高度。
     """
     import matplotlib.pyplot as plt
-    q, srt, r = a["quad"], a["sorted"], a["router"]
+    srt, r = a["sorted"], a["router"]
     af, ap, ceil = a["acc_fast"], a["acc_pow"], a["ceiling"]
     delta, p = srt["delta"], srt["p"]
 
-    lo, hi, axt = _fig1_axes(ax, a, c, tau="axis")
+    lo, hi, axt = _fig1_axes(ax, a, c, tau="axis", zero=True)
     ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（上行）／這個作業點的 $ 每千題（下行）",
                   color=c["ink2"])
     ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
@@ -968,17 +974,19 @@ def _explained_chart(ax, a, c, drops):
                     bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
                     arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
 
-    # ①② 兩端點 ③ oracle 轉折 ④ 綠線右端和 ② 的差
+    # ①② 兩端點 ③ oracle 轉折 ④ 天花板的高度（從 0% 量起）
     badge(0, af, 1, 22, -22)
     badge(1, ap, 2, -22, -24)
     knee = a["knee"]
     ax.plot([knee], [ceil], "o", ms=6, color=c["oracle"], markeredgecolor=c["surface"],
             markeredgewidth=1.5, zorder=6)
     badge(knee, ceil, 3, 18, 16)
-    if q["fast_only"]:
-        ax.annotate("", (0.992, ap), (0.992, ceil),
-                    arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0))
-        badge(0.992, (ap + ceil) / 2, 4, -22, 0)
+    # ④ 雙箭頭從 0% 量到天花板；在 ② 的高度加一道短橫線，分出 powerful 對 / N 和只有 fast 對 / N
+    ax.annotate("", (0.992, 0.0), (0.992, ceil),
+                arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0),
+                zorder=4)
+    ax.plot([0.992], [ap], "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
+    badge(0.992, ceil / 2, 4, -22, 0)
 
     # ⑤ τ = 0.5：從上方刻度往下對到藍線，再往左讀 Y、往下讀 X
     k5 = int((p >= 0.5).sum())
@@ -1026,6 +1034,7 @@ def _explained_lines(a, show_drops):
     # 一題的份量在大 N 時不到 0.1%（AI2ARC 1/3548），印成 0.0% 會被讀成「沒影響」
     pct_s = lambda v: f"{v:.2%}" if 0 < abs(v) < 0.01 else f"{v:.1%}"
     up5, dn5 = int((delta[:k5] > 0).sum()), int((delta[:k5] < 0).sum())
+    n_pow = q["both"] + q["pow_only"]  # powerful 答對的題數
     pow5, fast5 = srt["kp"][:k5].sum(), srt["kf"][k5:].sum()
     pr = PRICES
     table = [("", "powerful 對", "powerful 錯"),
@@ -1039,12 +1048,15 @@ def _explained_lines(a, show_drops):
         (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b", None),
         (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b", None),
         (1, f"轉折在 {q['pow_only']} / {n} = {pct1(knee)}：升級完這 {q['pow_only']} 題就到頂", "b", None),
-        (1, f"天花板 = (powerful 對 {q['both'] + q['pow_only']} + 只有 fast 對 {q['fast_only']}) / {n}"
+        (0, f"④ 天花板的高度 = (powerful 對 {n_pow} + 只有 fast 對 {q['fast_only']}) / {n}"
             f" = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
+        (1, "右端雙箭頭從 0% 量到天花板（所以這張的 Y 軸從 0% 開始）", "b", None),
+        (1, f"0% → ②（箭頭上的短橫線）= powerful 對 {n_pow} / {n} = {pct1(ap)}", "b", None),
+        (1, (f"短橫線以上 = 只有 fast 對 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
+             f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級")
+         if q["fast_only"] else "短橫線以上 = 0：沒有 fast 對、powerful 錯的題目，天花板就是 ②",
+         "b", None),
     ]
-    if q["fast_only"]:
-        lines.append((0, f"④ 綠線比 ② 高 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
-                         f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級", "b", None))
     lines += [
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {k5} 題 → {k5} / {n} = {pct1(x5)}", "b", None),
         (1, f"其中 +1 有 {up5} 題、-1 有 {dn5} 題 → {pct1(af)} + ({up5} - {dn5}) / {n} = {pct1(y5)}",
@@ -1087,7 +1099,8 @@ def fig1_explained(a, c, path, name, drops=True):
     drops=True 時每一個往下掉的階都標 ▼（⑥）；False 是不標 ▼ 的版本（_explained_no_down），
     圖上只到 ⑤，右邊也不寫 ⑥。沒有往下掉的階時兩版一樣。
 
-    圖面和 fig1_main(tau="axis") 相同，另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
+    圖面和 fig1_main(tau="axis") 相同，只是 Y 軸從 0% 開始（④ 從 0 量天花板的高度），
+    另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
     不放 CPT 和隨機升級（以及拿隨機升級當基準的 APGR）：只留看懂藍線、綠線本身需要的東西。
     右邊的數字全部從 a 算，換資料、換 model 配對、換 router（ROUTER_NAME）都會跟著變，不是寫死的。
     乾淨版照舊產生；這張只是多一張，給第一次看圖的人。圖和文字分開的版本見 fig1_explained_split。
