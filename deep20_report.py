@@ -2183,8 +2183,13 @@ def _gutter(models):
 
 
 def _label_left_ends(ax, ma, models, c, lo, hi):
-    """每個 fast 的左端點旁標「名字 + 全送 fast 正確率」，靠得太近時往上推開、拉一條引線。"""
-    gap = (hi - lo) * 0.075
+    """每個 fast 的左端點旁標「名字 + 全送 fast 正確率」，靠得太近時往上推開、拉一條引線。
+
+    兩行字約 24 點高，間距照繪圖區的實際高度換算成資料座標，不管 Y 軸跨距多大都剛好不疊。
+    """
+    fig = ax.get_figure()
+    h_pt = ax.get_position().height * fig.get_figheight() * 72
+    gap = (hi - lo) * 24 / h_pt
     placed = []
     for y, m in sorted((ma[m]["acc_fast"], m) for m in models):
         placed.append([max(y, placed[-1][0] + gap) if placed else y, m, y])
@@ -2199,10 +2204,11 @@ def _label_left_ends(ax, ma, models, c, lo, hi):
             ax.plot([-0.035, -0.014], [y_lab, y], color=c["muted"], lw=0.7, zorder=4)
 
 
-def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True):
+def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True, zero=False):
     """多個 fast 的藍線疊在同一張圖上。ma = {fast: analyse()}，必須是同一組題目。
 
     粗線 = 該 fast 的 router 曲線，同色細線 = 該 fast 的 oracle，右端黑點 = 全送 powerful（共用）。
+    zero=True 時 Y 軸從 0% 開始（說明版要從 0 量天花板的高度）；否則從資料附近開始，看得到細節。
     回傳 (Y 下限, Y 上限, 上方 τ 軸或 None)。
     """
     style_axes(ax, c)
@@ -2217,7 +2223,8 @@ def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True):
     ax.plot([1], [ref["acc_pow"]], "o", ms=8, color=c["ink"], zorder=6,
             markeredgecolor=c["surface"], markeredgewidth=2)
 
-    lo = min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values()) - 0.03
+    lo = 0.0 if zero else \
+        min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values()) - 0.03
     ceil = max(a["ceiling"] for a in ma.values())
     # 上方留白跟著跨距放大（AIME 跨 50 分以上時，③ 的標記才不會頂到上方的 τ 刻度）
     hi = min(ceil + max(0.02, 0.07 * (ceil - lo)), max(1.0, ceil + 0.005))
@@ -2348,10 +2355,14 @@ def fig_multi_per_bench(mb, models, c, path):
 
 # ---- 說明版 ----
 def _multi_explained_chart(ax, ma, models, c):
-    """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。"""
+    """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。
+
+    Y 軸從 0% 開始：④ 量的是天花板的「高度」，箭頭要從 0 畫起才是真的高度。
+    曲線因此被壓扁，要看細節用不是說明版的 curve_tau_axis.png（Y 軸從資料附近開始）。
+    """
     col = fast_colors(models, c)
     ref = ma[models[0]]
-    lo, hi, axt = _cmp_curve_axes(ax, ma, models, c)
+    lo, hi, axt = _cmp_curve_axes(ax, ma, models, c, zero=True)
     ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（每個 fast 都一樣）", color=c["ink2"])
     ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
     axt.set_xlabel("上方 X 軸：門檻 τ（route_p ≥ τ 的題目送 powerful，和 fast 是誰無關）",
@@ -2373,20 +2384,19 @@ def _multi_explained_chart(ax, ma, models, c):
                 markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=6)
     top = max(models, key=lambda m: ma[m]["ceiling"])
     badge(ma[top]["knee"], ma[top]["ceiling"], 3, 18, 16)
-    # ④ 天花板比 ② 高的那一段 = 只有 fast 對 / N：右端每個 fast 一支同色雙箭頭，從 ② 量到自己的天花板。
-    # 天花板的高度不只看「只有 powerful 對」，這一段就是各色天花板不一樣高的原因。
+    # ④ 天花板的高度：右端每個 fast 一支同色雙箭頭，從 0% 量到自己的天花板。
+    # 每支都經過 ② 的高度：0 → ② 是 powerful 對 / N（每個 fast 一樣），
+    # ② 以上是只有 fast 對 / N（各自不同）—— 這一段就是各色天花板不一樣高的原因。
     ap = ref["acc_pow"]
-    xs4 = []
-    for i, m in enumerate(models):
-        if ma[m]["quad"]["fast_only"]:
-            x4 = 0.992 - 0.016 * i
-            xs4.append((x4, m))
-            ax.annotate("", (x4, ap), (x4, ma[m]["ceiling"]),
-                        arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.1,
-                                        shrinkA=0, shrinkB=0), zorder=6)
-    if xs4:
-        x4, m4 = min(xs4)  # 最左邊那支旁邊放 ④
-        badge(x4, (ap + ma[m4]["ceiling"]) / 2, 4, -22, 0)
+    xs4 = [0.992 - 0.018 * i for i in range(len(models))]
+    for x4, m in zip(xs4, models):
+        ax.annotate("", (x4, 0.0), (x4, ma[m]["ceiling"]),
+                    arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.2,
+                                    shrinkA=0, shrinkB=0), zorder=4)
+    # 每支箭頭在 ② 的高度加一道短橫線，標出「powerful 對」和「只有 fast 對」的分界
+    # （畫在曲線上層：右端各條曲線都收斂到 ② 附近，虛線會被蓋掉）
+    ax.plot(xs4, [ap] * len(xs4), "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
+    badge(min(xs4), ma[models[-1]]["ceiling"] / 2, 4, -22, 0)
     # ⑤ τ = 0.5：從上方刻度往下，和每條線各交一點
     tp = tau_point(ref)
     x5 = tp["call"]
@@ -2441,8 +2451,9 @@ def _multi_explained_lines(ma, models):
         (0, "③ 同色細線 = 該 fast 的 oracle：事先知道答案，先升級「只有 powerful 對」的題目", "b"),
         (1, "轉折的橫軸位置 = 只有 powerful 對 / N：升級完這些題就到頂，再升級也不會更高", "b"),
         (0, "④ 天花板的高度 = (powerful 對 + 只有 fast 對) / N = (N - 兩個都錯) / N", "b"),
-        (1, "「只有 fast 對」= powerful 錯、fast 對的題目，oracle 把它們留給 fast", "b"),
-        (1, "→ 天花板比 ② 高「只有 fast 對」/ N（右端的同色雙箭頭）", "b"),
+        (1, "右端同色雙箭頭從 0% 量到各自的天花板（所以這張的 Y 軸從 0% 開始）", "b"),
+        (1, "0% → ②（箭頭上的短橫線）那一段 = powerful 對 / N：每個 fast 都一樣", "b"),
+        (1, "短橫線以上那一段 = 只有 fast 對 / N：powerful 錯、fast 對的題目，oracle 留給 fast", "b"),
         (1, "powerful 一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
         (0, t_orc, "t"),
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
