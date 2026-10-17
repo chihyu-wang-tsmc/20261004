@@ -56,6 +56,8 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/fig1_main_tau_axis_<bench>.png   做法 B 的四個 bench 各一張（gpqa / ai2arc / aime / gsm8k）
     deep20_report/fig1_main_tau_axis_explained.png / _<bench>_explained.png
                                       同上的說明版：圖上標 1–6，右邊逐項寫出每個數字怎麼算（需要中文字型）
+    deep20_report/fig1_main_tau_axis_explained_no_down.png / _<bench>_explained_no_down.png
+                                      同上，但不標往下掉的階（▼），只到 ⑤
     deep20_report/fig2_per_bench.png  正文圖 2：四個 bench 分開看
     deep20_report/fig2_per_bench_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
     deep20_report/fig2_per_bench_zoom.png   同上，Y 軸每格各自從藍線附近開始（跨距各格不同）
@@ -895,8 +897,11 @@ def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
     return lo, hi, axt
 
 
-def fig1_explained(a, c, path, name):
+def fig1_explained(a, c, path, name, drops=True):
     """圖 1（上方標 τ）的說明版：圖上用 1–6 標出每個數字的位置，右邊逐項寫出怎麼算。
+
+    drops=True 時每一個往下掉的階都標 ▼（⑥）；False 是不標 ▼ 的版本（_explained_no_down），
+    圖上只到 ⑤，右邊也不寫 ⑥。沒有往下掉的階時兩版一樣。
 
     圖面和 fig1_main(tau="axis") 相同，另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
     不放 CPT 和隨機升級（以及拿隨機升級當基準的 APGR）：只留看懂藍線、綠線本身需要的東西。
@@ -953,7 +958,8 @@ def fig1_explained(a, c, path, name):
 
     # ⑥ 每一個往下掉的階：升級到「fast 對、powerful 錯」的題目
     down = np.where(delta < 0)[0]
-    if len(down):
+    show_drops = drops and len(down) > 0
+    if show_drops:
         ax.plot(r["call"][down + 1], r["acc"][down + 1], "v", ms=7, color=c["mark"],
                 markeredgecolor=c["surface"], markeredgewidth=1.0, zorder=6)
         mid = down[np.argmin(np.abs(r["call"][down + 1] - 0.5))]
@@ -962,9 +968,10 @@ def fig1_explained(a, c, path, name):
     handles = [
         plt.Line2D([], [], color=c["router"], lw=2.2, label=f"{ROUTER_NAME} model_route"),
         plt.Line2D([], [], color=c["oracle"], lw=1.6, label="Oracle（上界）"),
-        plt.Line2D([], [], color=c["mark"], marker="v", ls="", ms=7, label="往下一階"),
     ]
-    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=3,
+    if show_drops:
+        handles.append(plt.Line2D([], [], color=c["mark"], marker="v", ls="", ms=7, label="往下一階"))
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=len(handles),
               labelcolor=c["ink2"], fontsize=9)
 
     # ---------------------------------------------------------------- 右邊：逐項推導
@@ -982,7 +989,7 @@ def fig1_explained(a, c, path, name):
         (0, f"fast = {ROUTE_FAST}　powerful = {ROUTE_POWERFUL}　router = {ROUTER_NAME}", "m"),
         (0, "兩個 model 對 N 題各答一次的結果", "h"),
         (0, "TABLE", "t"),
-        (0, "圖上 1–6 的數字怎麼來", "h"),
+        (0, f"圖上 1–{6 if show_drops else 5} 的數字怎麼來", "h"),
         (0, f"① 全送 fast（左端黑點）= ({q['both']} + {q['fast_only']}) / {n} = {pct1(af)}", "b"),
         (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b"),
         (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b"),
@@ -998,9 +1005,10 @@ def fig1_explained(a, c, path, name):
         (1, f"$ = (前 {k5} 題 powerful ${pow5:.4f} + 其餘 {n - k5} 題 fast ${fast5:.4f}) / {n} × 1000"
             f" = ${r['cost'][k5] * 1000:.2f}", "b"),
     ]
+    if show_drops:
+        lines.append((0, f"⑥ ▼ 升級到「fast 對、powerful 錯」的題目，正確率掉 1 / {n} = {pct_s(1 / n)}"
+                         f"（共 {q['fast_only']} 題）", "b"))
     lines += [
-        (0, f"⑥ ▼ 升級到「fast 對、powerful 錯」的題目，正確率掉 1 / {n} = {pct_s(1 / n)}"
-            f"（共 {q['fast_only']} 題）", "b"),
         (0, "三條軸", "h"),
         (0, "Y　照門檻分派後，N 題最後答對的比例（不是 router 選對的比例）", "b"),
         (1, r"藍線 $A(k) = A_F + (1/N)\,\Sigma_{j \leq k}\,(y_P - y_F)$，每一項是 +1、0 或 -1", "math"),
@@ -1718,12 +1726,15 @@ def cmd_report(args):
                 fig1_main(b, c, os.path.join(args.out, f"fig1_main_tau_axis_{name}{sfx}.png"),
                           tau=variant, title=f"{name.upper()}　n = {b['n']}", **kw)
             # 說明版：圖上標 1–6，右邊逐項推導。全是中文，沒有 CJK 字型就不畫（不要變豆腐）
+            # 兩版：_explained 標出每一個往下掉的階（▼），_explained_no_down 不標
             if ZH:
-                fig1_explained(a, c, os.path.join(
-                    args.out, f"fig1_main_tau_axis_explained{sfx}.png"), "合計")
-                for name, b in per_bench.items():
-                    fig1_explained(b, c, os.path.join(
-                        args.out, f"fig1_main_tau_axis_{name}_explained{sfx}.png"), name.upper())
+                for tag, drops in (("", True), ("_no_down", False)):
+                    fig1_explained(a, c, os.path.join(
+                        args.out, f"fig1_main_tau_axis_explained{tag}{sfx}.png"), "合計", drops)
+                    for name, b in per_bench.items():
+                        fig1_explained(b, c, os.path.join(
+                            args.out, f"fig1_main_tau_axis_{name}_explained{tag}{sfx}.png"),
+                            name.upper(), drops)
             else:
                 print("  [skip] fig1_main_tau_axis_*_explained：找不到中文字型")
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
