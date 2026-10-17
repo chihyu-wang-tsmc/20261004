@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1264" height="2364" viewBox="0 0 1264 2364" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" role="img" aria-label="hierarchical_cpc_h2o.py 程式流程：載入 CPC zip 建樹後，beam search（K=3）和 greedy search 在每個節點呼叫 choose()，choose 先查快取、只有一個選項就不問，否則組一題 Choice 送到本機 h2o-lightning，失敗時依 with_retry 重試，最後輸出 cpc_tree.svg 和 results.md。">
+<defs><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4a5160"/></marker><marker id="agr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d8656"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2c55c9"/></marker></defs>
+<rect x="0" y="0" width="1264" height="2364" fill="#ffffff"/>
+<text x="24" y="50" fill="#1f2430" font-size="22" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">hierarchical_cpc_h2o.py 程式流程</text>
+<text x="24" y="78" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">照官網 CPC patents 範例：每個節點問 h2o-lightning 一題 Choice，比較 greedy 和 beam search（K = 3）</text>
+<rect x="760" y="104" width="22" height="14" rx="3" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.5"/>
+<text x="790" y="116" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">問 h2o-lightning（本機 :8741）</text>
+<rect x="1010" y="104" width="22" height="14" rx="3" fill="#f8dcd8" stroke="#c0392b" stroke-width="1.5"/>
+<text x="1040" y="116" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">拋出例外、程式中止</text>
+<polyline points="760,140 784,140" fill="none" stroke="#1d8656" stroke-width="1.7"/>
+<text x="790" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<polyline points="880,140 904,140" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<text x="910" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否 / 下一步</text>
+<polyline points="1000,140 1024,140" fill="none" stroke="#c0392b" stroke-width="1.7"/>
+<text x="1030" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">錯誤</text>
+<polyline points="1120,140 1144,140" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<text x="1150" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">呼叫函式</text>
+<rect x="760" y="160" width="22" height="14" rx="3" fill="none" stroke="#9aa1ad" stroke-dasharray="4 3"/>
+<text x="790" y="172" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">函式範圍</text>
+<rect x="150.0" y="104" width="340" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="131.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">python hierarchical_cpc_h2o.py</text>
+<polyline points="320,148 320,174" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="40" y="176" width="560" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="58" y="204" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">載入模組（import 時就做）</text>
+<text x="58" y="230" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">client = H2OClassifier(timeout=120).with_retry(...)</text>
+<text x="58" y="254" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">json_cache：讀 hierarchical_cpc_h2o/json_cache.json，沒有就從空的開始</text>
+<polyline points="320,272 320,328" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="24" y="292" width="592" height="434" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<text x="40" y="316" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">main() → load_hierarchies()</text>
+<rect x="90.0" y="330" width="460" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="355.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">CPC zip 已經在 repo 裡？</text>
+<text x="320" y="374.0" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">hierarchical_cpc/datasets/CPCSchemeXML202605.zip</text>
+<polyline points="550,358 668,358" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="560" y="351" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="670" y="320" width="560" height="76" rx="10" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.8"/>
+<text x="688" y="348" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">_download：從 CPC archive 下載</text>
+<text x="688" y="374" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">先寫到 .tmp，完成後才改名；只有 zip 不見時才會連網路</text>
+<polyline points="950,396 950,484 602,484" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="320,386 320,426" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="328" y="411" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="40" y="428" width="560" height="120" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="58" y="456" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">_load_cpc：把 CPC scheme 解析成一棵樹</text>
+<text x="58" y="482" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">讀 zip 裡 800 個 cpc-scheme-*.xml，遞迴走每個 classification-item</text>
+<text x="58" y="506" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">每個 symbol 記下標題和 level，第一次遇到的上層就是它的父節點</text>
+<text x="58" y="530" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">從 level 2 的 9 個 section（A–H、Y）往下建樹：254,274 個節點</text>
+<polyline points="320,548 320,574" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="40" y="576" width="560" height="120" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="58" y="604" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">Hierarchy：題目和標準答案</text>
+<text x="58" y="630" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">document：專利摘要（a freestanding structural wooden perch …）</text>
+<text x="58" y="654" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">expected_leaf：A01K31/12 Perches for poultry or birds, e.g. roosts</text>
+<text x="58" y="678" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">正確路徑 5 層：A → A01 → A01K → A01K31/00 → A01K31/12</text>
+<polyline points="320,726 320,874" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="20" y="750" width="600" height="1346" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<text x="36" y="774" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">compare_searches(hierarchy)</text>
+<text x="36" y="794" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">先跑 beam，再跑 greedy</text>
+<rect x="36" y="814" width="568" height="740" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<text x="52" y="838" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">beam_search · K = 3</text>
+<text x="52" y="858" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">BEAM_WIDTH = 3、MAX_DEPTH = 12</text>
+<rect x="64" y="876" width="512" height="44" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="320.0" y="903.5" fill="#1f2430" font-size="15" font-weight="700" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">beam = [根節點]，score = 1.0</text>
+<polyline points="320,920 320,948" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="140.0" y="950" width="360" height="48" rx="24.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="979.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">還沒滿 12 輪？（MAX_DEPTH）</text>
+<polyline points="320,998 320,1024" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="328" y="1016" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="64" y="1026" width="512" height="44" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="320.0" y="1053.5" fill="#1f2430" font-size="15" font-weight="700" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">分成 expandable（有子節點）／ finished（已到葉）</text>
+<polyline points="320,1070 320,1096" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="170.0" y="1098" width="300" height="48" rx="24.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="1127.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">還有 expandable 嗎？</text>
+<polyline points="320,1146 320,1172" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="328" y="1164" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="64" y="1174" width="512" height="72" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="82" y="1202" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">平行問 h2o（ThreadPoolExecutor，3 個 thread）</text>
+<text x="82" y="1228" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">每條 expandable 路徑各呼叫一次 choose(document, 子節點)</text>
+<polyline points="320,1246 320,1272" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="64" y="1274" width="512" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="82" y="1302" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">extend_candidate：每條路徑 × 每個子節點</text>
+<text x="82" y="1328" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">選項 &gt; 1 才算一次決策：product × max(p, 1e-9)，決策數 + 1</text>
+<text x="82" y="1352" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">score = product ^ (1 / 決策數)，也就是幾何平均</text>
+<polyline points="320,1370 320,1396" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="64" y="1398" width="512" height="72" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="82" y="1426" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">finished + 新路徑一起排序，留 score 前 3 名 → 新 beam</text>
+<text x="82" y="1452" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">同時記下 records（問過的節點和機率）、retained_paths</text>
+<polyline points="64,1434 50,1434 50,974 138,974" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="58" y="967" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">下一輪</text>
+<polyline points="500,974 590,974 590,1514 578,1514" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="508" y="967" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<polyline points="470,1122 590,1122" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<text x="478" y="1115" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="64" y="1492" width="512" height="44" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="320.0" y="1519.5" fill="#1f2430" font-size="15" font-weight="700" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">beam 照 score 排序，beam[0] 的最後一個節點就是答案</text>
+<polyline points="320,1536 320,1624" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="36" y="1570" width="568" height="388" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<text x="52" y="1594" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">greedy_search</text>
+<text x="52" y="1614" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">每層只走機率最高的一條，走錯就回不來</text>
+<rect x="120.0" y="1626" width="400" height="48" rx="24.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="1655.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">目前節點還有子節點？（最多 12 層）</text>
+<polyline points="320,1674 320,1700" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="328" y="1692" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="64" y="1702" width="512" height="72" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="82" y="1730" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">choose(document, 子節點)</text>
+<text x="82" y="1756" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">beam 問過的節點直接走快取，不會再問一次 h2o</text>
+<polyline points="320,1774 320,1800" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="64" y="1802" width="512" height="72" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="82" y="1830" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">選機率最大的子節點往下走</text>
+<text x="82" y="1856" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">選項 &gt; 1 時：product × max(p, 1e-9)，決策數 + 1</text>
+<polyline points="64,1838 50,1838 50,1650 118,1650" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="58" y="1643" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">下一層</text>
+<polyline points="520,1650 590,1650 590,1918 578,1918" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="528" y="1643" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="64" y="1896" width="512" height="44" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="320.0" y="1923.5" fill="#1f2430" font-size="15" font-weight="700" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">greedy 的答案 = 走到的最後一個節點</text>
+<polyline points="320,1940 320,1982" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="40" y="1984" width="560" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="58" y="2012" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">合併結果</text>
+<text x="58" y="2038" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">records 補上 greedy 問過、beam 沒問的節點（畫圖用）</text>
+<text x="58" y="2062" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">separation = beam 第 1 名 score ÷ 第 2 名 score</text>
+<polyline points="320,2080 320,2122" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="40" y="2124" width="560" height="144" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="58" y="2152" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">輸出</text>
+<text x="58" y="2178" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">render_svg → hierarchical_cpc_h2o/cpc_tree.svg</text>
+<text x="58" y="2202" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">　綠 = beam 答案路徑、橘 = greedy、紫 = beam 留過的、虛線 = 剪掉</text>
+<text x="58" y="2226" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">greedy、beam 的答案各自跟 expected_leaf 比對，組成結果表格</text>
+<text x="58" y="2250" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">印在畫面上，同時寫進 hierarchical_cpc_h2o/results.md</text>
+<polyline points="320,2268 320,2294" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="220.0" y="2296" width="200" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="320" y="2323.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">結束</text>
+<rect x="664" y="574" width="564" height="144" rx="10" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.8"/>
+<text x="682" y="602" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">會讀寫的檔案、會連的地方</text>
+<text x="682" y="628" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">讀：hierarchical_cpc/datasets/CPCSchemeXML202605.zip（已入版控）</text>
+<text x="682" y="652" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">讀寫：hierarchical_cpc_h2o/json_cache.json（快取，不入版控）</text>
+<text x="682" y="676" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">寫：hierarchical_cpc_h2o/cpc_tree.svg、results.md</text>
+<text x="682" y="700" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">網路：只連 http://localhost:8741；zip 不見時才連 CPC 官網</text>
+<rect x="648" y="1064" width="596" height="854" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<text x="664" y="1088" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">choose(state, labels)</text>
+<text x="664" y="1108" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">外面包 @json_cache；beam、greedy 每問一個節點就呼叫一次</text>
+<polyline points="576,1210 646,1210" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#ab)"/>
+<polyline points="576,1738 646,1738" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#ab)"/>
+<rect x="680.0" y="1124" width="300" height="48" rx="24.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="830" y="1153.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">快取裡有這組（題目, 選項）？</text>
+<polyline points="980,1148 1014,1148" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="996" y="1140" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="1016" y="1116" width="212" height="64" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="1034" y="1144" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">直接回傳快取</text>
+<text x="1034" y="1170" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不問 h2o</text>
+<polyline points="830,1172 830,1198" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="838" y="1190" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="710.0" y="1200" width="240" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="830" y="1227.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">只有 1 個選項？</text>
+<polyline points="950,1222 1014,1222" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="982" y="1214" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="1016" y="1190" width="212" height="64" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="1034" y="1218" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">{該選項: 1.0}</text>
+<text x="1034" y="1244" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">存快取後回傳，不問 h2o</text>
+<polyline points="830,1244 830,1274" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="838" y="1264" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="664" y="1276" width="564" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="682" y="1304" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">child_question：每個子節點一個選項，組成一題 Choice</text>
+<text x="682" y="1330" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">instructions = &quot;Which direct child category best matches this document?&quot;</text>
+<text x="682" y="1354" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">criteria     = {&quot;c0&quot;: 子節點0, &quot;c1&quot;: 子節點1, …}</text>
+<polyline points="830,1372 830,1400" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="664" y="1402" width="564" height="96" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="682" y="1430" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">H2OClassifier.invoke → POST localhost:8741/v1/systemone</text>
+<text x="682" y="1456" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">body = {state: 專利摘要, questions: {child: Choice}}</text>
+<text x="682" y="1480" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">timeout 120 秒</text>
+<polyline points="830,1498 830,1552" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="700.0" y="1554" width="260" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="830" y="1581.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">回應成功（2xx）？</text>
+<polyline points="960,1576 1010,1576" fill="none" stroke="#c0392b" stroke-width="1.7" marker-end="url(#ar)"/>
+<text x="985" y="1568" fill="#c0392b" font-size="12.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<rect x="1012" y="1544" width="222" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="1030" y="1572" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">with_retry：能重試嗎？</text>
+<text x="1030" y="1598" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">連線失敗 / 逾時 / 429 / 5xx</text>
+<text x="1030" y="1622" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">而且還沒試滿 6 次</text>
+<polyline points="1123,1544 1123,1500" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<text x="1116" y="1527" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="end" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">能：等 1~20 秒再送</text>
+<polyline points="1123,1640 1123,1676" fill="none" stroke="#c0392b" stroke-width="1.7" marker-end="url(#ar)"/>
+<text x="1130" y="1664" fill="#c0392b" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不能</text>
+<rect x="1012" y="1678" width="222" height="96" rx="10" fill="#f8dcd8" stroke="#c0392b" stroke-width="1.8"/>
+<text x="1030" y="1706" fill="#c0392b" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">拋出例外，程式中止</text>
+<text x="1030" y="1732" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">試滿 6 次，或 400 / 422 等</text>
+<text x="1030" y="1756" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不重試的錯誤</text>
+<polyline points="830,1598 830,1624" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<text x="838" y="1616" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<rect x="664" y="1626" width="326" height="96" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="682" y="1654" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">_parse</text>
+<text x="682" y="1680" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">confidence 照 TypeSafe 文件重算</text>
+<text x="682" y="1704" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">機率 {c0: p, …} 換回子節點名稱</text>
+<polyline points="830,1722 830,1748" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="664" y="1750" width="326" height="72" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="682" y="1778" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">寫進快取</text>
+<text x="682" y="1804" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">整檔重寫 json_cache.json</text>
+<polyline points="830,1822 830,1848" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<rect x="700.0" y="1850" width="260" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="830" y="1877.0" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">回傳 {子節點: 機率}</text>
+</svg>
