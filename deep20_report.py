@@ -945,14 +945,27 @@ def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
     return lo, hi, axt
 
 
+def _axis_break(ax, x, lo, hi, c, n_arrows=1):
+    """在 Y 軸底附近畫一個「≈」：箭頭的下端是 Y 軸底，不是 0%，中間截掉了。
+
+    底色和背景一樣，蓋在箭頭上就像把箭頭切斷；多 fast 版幾支箭頭擠在一起，共用一個，
+    兩側補空白把底色撐寬，才會把每一支都切斷。
+    """
+    pad_ = " " * (2 * (n_arrows - 1))
+    ax.text(x, lo + 0.045 * (hi - lo), f"{pad_}≈{pad_}", ha="center", va="center", fontsize=15,
+            color=c["ink2"], zorder=8,
+            bbox=dict(boxstyle="square,pad=0.05", fc=c["surface"], ec="none"))
+
+
 def _explained_chart(ax, a, c, drops):
     """說明版左邊的圖：圖 1（上方標 τ）加上 1–6 的標記、τ = 0.5 的讀圖路徑、往下掉的階（▼）。
 
     fig1_explained（圖文合一）和 fig1_explained_split（只有圖）共用。回傳有沒有標 ▼。
-    Y 軸從資料附近開始（不從 0），所以 ④ 的箭頭量的是「天花板比 ② 高多少」，不是天花板的高度。
+    Y 軸從資料附近開始（不從 0）。④ 的箭頭從 Y 軸底畫到天花板，下端用「≈」標出截掉了；
+    箭頭上的短橫線是 ② 的高度，以上那一段就是只有 fast 對 / N。
     """
     import matplotlib.pyplot as plt
-    q, srt, r = a["quad"], a["sorted"], a["router"]
+    srt, r = a["sorted"], a["router"]
     af, ap, ceil = a["acc_fast"], a["acc_pow"], a["ceiling"]
     delta, p = srt["delta"], srt["p"]
 
@@ -969,18 +982,21 @@ def _explained_chart(ax, a, c, drops):
                     bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
                     arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
 
-    # ①② 兩端點 ③ oracle 轉折 ④ 天花板比 ② 高的那一段
+    # ①② 兩端點 ③ oracle 轉折 ④ 天花板的高度（從 Y 軸底畫起）
     badge(0, af, 1, 22, -22)
     badge(1, ap, 2, -22, -24)
     knee = a["knee"]
     ax.plot([knee], [ceil], "o", ms=6, color=c["oracle"], markeredgecolor=c["surface"],
             markeredgewidth=1.5, zorder=6)
     badge(knee, ceil, 3, 18, 16)
-    # ④ 雙箭頭從 ② 量到天花板 = 只有 fast 對 / N（沒有這種題目時兩者一樣高，不畫）
-    if q["fast_only"]:
-        ax.annotate("", (0.992, ap), (0.992, ceil),
-                    arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0))
-        badge(0.992, (ap + ceil) / 2, 4, -22, 0)
+    # ④ 雙箭頭從 Y 軸底畫到天花板（下端用 ≈ 標出截掉了）；② 的高度一道短橫線，以上 = 只有 fast 對 / N
+    ax.annotate("", (0.992, lo), (0.992, ceil),
+                arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0),
+                zorder=4)
+    ax.plot([0.992], [ap], "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
+    _axis_break(ax, 0.992, lo, hi, c)
+    # ④ 放在箭頭下段：中段常和藍線右端、② 擠在一起
+    badge(0.992, lo + 0.3 * (ceil - lo), 4, -22, 0)
 
     # ⑤ τ = 0.5：從上方刻度往下對到藍線，再往左讀 Y、往下讀 X
     k5 = int((p >= 0.5).sum())
@@ -1042,15 +1058,15 @@ def _explained_lines(a, show_drops):
         (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b", None),
         (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b", None),
         (1, f"轉折在 {q['pow_only']} / {n} = {pct1(knee)}：升級完這 {q['pow_only']} 題就到頂", "b", None),
-        (0, (f"④ 綠線比 ② 高 = 只有 fast 對 {q['fast_only']} / {n} = {pct_s(ceil - ap)}"
-             "（右端雙箭頭，從 ② 量到綠線）")
-         if q["fast_only"] else "④ 綠線和 ② 一樣高：沒有 fast 對、powerful 錯的題目", "b", None),
-        (1, f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級", "b", None)
-        if q["fast_only"] else None,
-        (1, f"天花板的高度 = ② + 這一段 = (powerful 對 {n_pow} + 只有 fast 對 {q['fast_only']}) / {n}"
+        (0, f"④ 天花板的高度 = (powerful 對 {n_pow} + 只有 fast 對 {q['fast_only']}) / {n}"
             f" = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
+        (1, "右端雙箭頭從 Y 軸底畫到綠線；Y 軸沒有從 0% 開始，「≈」表示下面截掉了", "b", None),
+        (1, f"箭頭上的短橫線是 ② 的高度 = powerful 對 {n_pow} / {n} = {pct1(ap)}", "b", None),
+        (1, (f"短橫線以上 = 只有 fast 對 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
+             f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級")
+         if q["fast_only"] else "短橫線以上 = 0：沒有 fast 對、powerful 錯的題目，天花板就是 ②",
+         "b", None),
     ]
-    lines = [x for x in lines if x is not None]
     lines += [
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {k5} 題 → {k5} / {n} = {pct1(x5)}", "b", None),
         (1, f"其中 +1 有 {up5} 題、-1 有 {dn5} 題 → {pct1(af)} + ({up5} - {dn5}) / {n} = {pct1(y5)}",
@@ -2362,7 +2378,7 @@ def _multi_explained_chart(ax, ma, models, c):
     """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。
 
     Y 軸從資料附近開始（不從 0）：各 fast 的差距只有幾個百分點，從 0 開始會被壓扁。
-    所以 ④ 的箭頭量的是「天花板比 ② 高多少」，不是天花板的高度。
+    ④ 的箭頭從 Y 軸底畫到各自的天花板，下端用「≈」標出截掉了；箭頭上的短橫線是 ② 的高度。
     """
     col = fast_colors(models, c)
     ref = ma[models[0]]
@@ -2388,20 +2404,19 @@ def _multi_explained_chart(ax, ma, models, c):
                 markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=6)
     top = max(models, key=lambda m: ma[m]["ceiling"])
     badge(ma[top]["knee"], ma[top]["ceiling"], 3, 18, 16)
-    # ④ 天花板比 ② 高的那一段 = 只有 fast 對 / N：右端每個 fast 一支同色雙箭頭，從 ② 量到自己的天花板。
-    # ② 每個 fast 都一樣，所以這一段就是各色天花板不一樣高的原因。
+    # ④ 天花板的高度：右端每個 fast 一支同色雙箭頭，從 Y 軸底畫到自己的天花板（下端用 ≈ 標出截掉了）。
+    # 每支箭頭在 ② 的高度有一道短橫線：以上 = 只有 fast 對 / N，各 fast 不同 —— 天花板不一樣高的原因。
     ap = ref["acc_pow"]
-    xs4 = []
-    for i, m in enumerate(models):
-        if ma[m]["quad"]["fast_only"]:  # 沒有「只有 fast 對」的題目時天花板就是 ②，不畫
-            x4 = 0.992 - 0.016 * i
-            xs4.append((x4, m))
-            ax.annotate("", (x4, ap), (x4, ma[m]["ceiling"]),
-                        arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.1,
-                                        shrinkA=0, shrinkB=0), zorder=6)
-    if xs4:
-        x4, m4 = min(xs4)  # 最左邊那支旁邊放 ④
-        badge(x4, (ap + ma[m4]["ceiling"]) / 2, 4, -22, 0)
+    xs4 = [0.992 - 0.018 * i for i in range(len(models))]
+    for x4, m in zip(xs4, models):
+        ax.annotate("", (x4, lo), (x4, ma[m]["ceiling"]),
+                    arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.2,
+                                    shrinkA=0, shrinkB=0), zorder=4)
+    # 短橫線畫在曲線上層：右端各條曲線都收斂到 ② 附近
+    ax.plot(xs4, [ap] * len(xs4), "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
+    _axis_break(ax, (min(xs4) + max(xs4)) / 2, lo, hi, c, n_arrows=len(xs4))
+    # ④ 放在箭頭下段：中段常和各條曲線的右端、② 擠在一起
+    badge(min(xs4), lo + 0.3 * (ma[models[-1]]["ceiling"] - lo), 4, -22, 0)
     # ⑤ τ = 0.5：從上方刻度往下，和每條線各交一點
     tp = tau_point(ref)
     x5 = tp["call"]
@@ -2455,10 +2470,11 @@ def _multi_explained_lines(ma, models):
         (1, "這兩格加起來就是 powerful 答對的題數，和 fast 是誰無關，所以只有一個黑點", "b"),
         (0, "③ 同色細線 = 該 fast 的 oracle：事先知道答案，先升級「只有 powerful 對」的題目", "b"),
         (1, "轉折的橫軸位置 = 只有 powerful 對 / N：升級完這些題就到頂，再升級也不會更高", "b"),
-        (0, "④ 天花板比 ② 高 = 只有 fast 對 / N（右端同色雙箭頭，從 ② 量到各自的天花板）", "b"),
-        (1, "「只有 fast 對」= powerful 錯、fast 對的題目，oracle 留給 fast", "b"),
-        (1, "天花板的高度 = ② + 這一段 = (powerful 對 + 只有 fast 對) / N = (N - 兩個都錯) / N", "b"),
-        (1, "② 每個 fast 都一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
+        (0, "④ 天花板的高度 = (powerful 對 + 只有 fast 對) / N = (N - 兩個都錯) / N", "b"),
+        (1, "右端同色雙箭頭從 Y 軸底畫到各自的天花板；Y 軸沒有從 0% 開始，「≈」表示下面截掉了", "b"),
+        (1, "箭頭上的短橫線是 ② 的高度 = powerful 對 / N，每個 fast 都一樣", "b"),
+        (1, "短橫線以上 = 只有 fast 對 / N：powerful 錯、fast 對的題目，oracle 留給 fast", "b"),
+        (1, "② 一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
         (0, t_orc, "t"),
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
             f" = {pct1(tp0['call'])}，每個 fast 都升級這 {tp0['k']} 題", "b"),
