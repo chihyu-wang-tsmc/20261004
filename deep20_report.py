@@ -886,18 +886,17 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8.4, 5.4))
     _fig1_axes(ax, a, c, band=band, random=random, tau=tau, title=title)
-    # 圖例放在繪圖區外（下方），不壓到資料
+    # 圖例放在繪圖區外（下方），不壓到資料；天花板箭頭那一項放第二列
+    handles, _ = ax.get_legend_handles_labels()
+    handles.append(ceiling_handle(c, zh=False))
     n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
               labelcolor=c["ink2"], fontsize=8.5)
     _save(fig, path, c)
 
 
-def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None, zero=False):
-    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。
-
-    zero=True 時 Y 軸從 0% 開始：說明版的 ④ 要從 0 量天花板的高度。fig1_main 不用，看得到細節。
-    """
+def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
+    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。"""
     style_axes(ax, c)
     r, o, d, s = a["router"], a["oracle"], a["random"], a["star"]
     axt = None
@@ -920,11 +919,9 @@ def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None, zero=Fa
     # 圖面只留資料：★ 記號、四組文字標註、CPT 的引線與標籤、標題、頁尾說明全部不畫。
     # 這些數字沒有消失，它們在主控台報表的表 1 和 tables.xlsx 裡。
     ax.set_xlim(-0.02, 1.02)
-    lo = 0.0 if zero else min(a["acc_fast"], r["acc"].min()) - 0.03
-    # 上限不超過 100%（正確率不會超過）；天花板剛好是 100% 時留一點邊，線才不會貼在框上。
-    # 從 0 開始時跨距大，上方留白跟著放大，③ 的標記才不會頂到上方的 τ 刻度
-    head = max(0.02, 0.07 * (a["ceiling"] - lo)) if zero else 0.02
-    hi = min(a["ceiling"] + head, max(1.0, a["ceiling"] + 0.005))
+    lo = min(a["acc_fast"], r["acc"].min()) - 0.03
+    # 上限不超過 100%（正確率不會超過）；天花板剛好是 100% 時留一點邊，線才不會貼在框上
+    hi = min(a["ceiling"] + 0.02, max(1.0, a["ceiling"] + 0.005))
     ax.set_ylim(lo, hi)
     pct_axis(ax.yaxis)
 
@@ -944,24 +941,79 @@ def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None, zero=Fa
         ax.set_ylim(lo, hi)
     elif tau in ("axis", "axis-conf"):
         axt = draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
+    # oracle 天花板的高度：從 Y 軸底畫到天花板（說明版的 ④；圖例那一項在 fig1_main 加）
+    draw_ceiling_arrows(ax, lo, hi, [a["ceiling"]], [c["ink2"]], a["acc_pow"], c, lw=0.9)
     if title:  # 上方有 τ 刻度時要讓開它（axis-conf 還多一行刻度和軸標題）
         ax.set_title(title, color=c["ink"], fontsize=11, loc="left",
                      pad={"axis": 22, "axis-conf": 48}.get(tau, 8))
     return lo, hi, axt
 
 
+def _axis_break(ax, x, lo, hi, c, n_arrows=1, fontsize=15, at=0.045):
+    """在 Y 軸底附近畫一個「≈」：箭頭的下端是 Y 軸底，不是 0%，中間截掉了。
+
+    底色和背景一樣，蓋在箭頭上就像把箭頭切斷；多 fast 版幾支箭頭擠在一起，共用一個，
+    兩側補空白把底色撐寬，才會把每一支都切斷。
+    """
+    pad_ = " " * (2 * (n_arrows - 1))
+    ax.text(x, lo + at * (hi - lo), f"{pad_}≈{pad_}", ha="center", va="center",
+            fontsize=fontsize, color=c["ink2"], zorder=8,
+            bbox=dict(boxstyle="square,pad=0.05", fc=c["surface"], ec="none"))
+
+
+CEIL_X0 = 0.992   # 天花板箭頭的位置：右端 ② 黑點的左邊一點
+
+
+def ceiling_xs(n, small=False):
+    """n 支天花板箭頭的橫軸位置，由右往左排（多 fast 時第 i 個 fast 用第 i 個）。"""
+    return [CEIL_X0 - (0.035 if small else 0.018) * i for i in range(n)]
+
+
+def draw_ceiling_arrows(ax, lo, hi, ceilings, colors, ap, c, small=False, lw=1.2):
+    """oracle 天花板的高度（說明版的 ④）：每個天花板一支雙箭頭，從 Y 軸底畫到天花板。
+
+    所有畫了 oracle 的圖都有（norm 版的 Y 不是正確率，不畫）。Y 軸不從 0% 開始，
+    所以下端用「≈」標出截掉了；每支箭頭在 ② 全送 powerful 的高度有一道短橫線，
+    以上那一段 = 只有 fast 對 / N。small=True 給四格小圖用：箭頭拉開一點、記號小一點。
+    回傳箭頭的橫軸位置（說明版拿來放 ④ 的標記）。
+    """
+    xs = ceiling_xs(len(ceilings), small)
+    arrow = dict(arrowstyle="<->", lw=lw, shrinkA=0, shrinkB=0)
+    if small:
+        arrow["mutation_scale"] = 6
+    for x, ceil, col in zip(xs, ceilings, colors):
+        ax.annotate("", (x, lo), (x, ceil), arrowprops=dict(arrow, color=col), zorder=4)
+    # 短橫線畫在曲線上層：右端各條曲線都收斂到 ② 附近
+    ax.plot(xs, [ap] * len(xs), "_", ms=7 if small else 10, mew=1.6 if small else 2.0,
+            color=c["ink"], zorder=7)
+    # 小圖的 ≈ 放高一點，才不會蓋住下端的箭頭
+    _axis_break(ax, (min(xs) + max(xs)) / 2, lo, hi, c, n_arrows=len(xs),
+                fontsize=11 if small else 15, at=0.10 if small else 0.045)
+    return xs
+
+
+def ceiling_handle(c, zh=True):
+    """圖例裡代表天花板箭頭的那一項。"""
+    import matplotlib.pyplot as plt
+    label = (t("天花板高度（≈ = Y 軸截斷，短橫線 = 全送 powerful）",
+               "oracle ceiling (≈ axis cut, tick = all powerful)") if zh
+             else "oracle ceiling (≈ axis cut, tick = all powerful)")
+    return plt.Line2D([], [], marker=r"$\updownarrow$", ls="", ms=9, color=c["ink2"], label=label)
+
+
 def _explained_chart(ax, a, c, drops):
     """說明版左邊的圖：圖 1（上方標 τ）加上 1–6 的標記、τ = 0.5 的讀圖路徑、往下掉的階（▼）。
 
     fig1_explained（圖文合一）和 fig1_explained_split（只有圖）共用。回傳有沒有標 ▼。
-    Y 軸從 0% 開始：④ 量的是天花板的「高度」，箭頭要從 0 畫起才是真的高度。
+    Y 軸從資料附近開始（不從 0）。④ 的箭頭從 Y 軸底畫到天花板，下端用「≈」標出截掉了；
+    箭頭上的短橫線是 ② 的高度，以上那一段就是只有 fast 對 / N。
     """
     import matplotlib.pyplot as plt
     srt, r = a["sorted"], a["router"]
     af, ap, ceil = a["acc_fast"], a["acc_pow"], a["ceiling"]
     delta, p = srt["delta"], srt["p"]
 
-    lo, hi, axt = _fig1_axes(ax, a, c, tau="axis", zero=True)
+    lo, hi, axt = _fig1_axes(ax, a, c, tau="axis")
     ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（上行）／這個作業點的 $ 每千題（下行）",
                   color=c["ink2"])
     ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
@@ -974,19 +1026,16 @@ def _explained_chart(ax, a, c, drops):
                     bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
                     arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
 
-    # ①② 兩端點 ③ oracle 轉折 ④ 天花板的高度（從 0% 量起）
+    # ①② 兩端點 ③ oracle 轉折 ④ 天花板的高度（從 Y 軸底畫起）
     badge(0, af, 1, 22, -22)
     badge(1, ap, 2, -22, -24)
     knee = a["knee"]
     ax.plot([knee], [ceil], "o", ms=6, color=c["oracle"], markeredgecolor=c["surface"],
             markeredgewidth=1.5, zorder=6)
     badge(knee, ceil, 3, 18, 16)
-    # ④ 雙箭頭從 0% 量到天花板；在 ② 的高度加一道短橫線，分出 powerful 對 / N 和只有 fast 對 / N
-    ax.annotate("", (0.992, 0.0), (0.992, ceil),
-                arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0),
-                zorder=4)
-    ax.plot([0.992], [ap], "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
-    badge(0.992, ceil / 2, 4, -22, 0)
+    # ④ 的箭頭（從 Y 軸底到天花板、≈、② 的短橫線）_fig1_axes 已經畫了，這裡只放標記；
+    # 放在箭頭下段：中段常和藍線右端、② 擠在一起
+    badge(CEIL_X0, lo + 0.3 * (ceil - lo), 4, -22, 0)
 
     # ⑤ τ = 0.5：從上方刻度往下對到藍線，再往左讀 Y、往下讀 X
     k5 = int((p >= 0.5).sum())
@@ -1011,6 +1060,7 @@ def _explained_chart(ax, a, c, drops):
         plt.Line2D([], [], color=c["router"], lw=2.2, label=f"{ROUTER_NAME} model_route"),
         plt.Line2D([], [], color=c["oracle"], lw=1.6, label="Oracle（上界）"),
     ]
+    handles.append(ceiling_handle(c))
     if show_drops:
         handles.append(plt.Line2D([], [], color=c["mark"], marker="v", ls="", ms=7, label="往下一階"))
     ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=len(handles),
@@ -1050,8 +1100,8 @@ def _explained_lines(a, show_drops):
         (1, f"轉折在 {q['pow_only']} / {n} = {pct1(knee)}：升級完這 {q['pow_only']} 題就到頂", "b", None),
         (0, f"④ 天花板的高度 = (powerful 對 {n_pow} + 只有 fast 對 {q['fast_only']}) / {n}"
             f" = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
-        (1, "右端雙箭頭從 0% 量到天花板（所以這張的 Y 軸從 0% 開始）", "b", None),
-        (1, f"0% → ②（箭頭上的短橫線）= powerful 對 {n_pow} / {n} = {pct1(ap)}", "b", None),
+        (1, "右端雙箭頭從 Y 軸底畫到綠線；Y 軸沒有從 0% 開始，「≈」表示下面截掉了", "b", None),
+        (1, f"箭頭上的短橫線是 ② 的高度 = powerful 對 {n_pow} / {n} = {pct1(ap)}", "b", None),
         (1, (f"短橫線以上 = 只有 fast 對 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
              f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級")
          if q["fast_only"] else "短橫線以上 = 0：沒有 fast 對、powerful 錯的題目，天花板就是 ②",
@@ -1099,8 +1149,7 @@ def fig1_explained(a, c, path, name, drops=True):
     drops=True 時每一個往下掉的階都標 ▼（⑥）；False 是不標 ▼ 的版本（_explained_no_down），
     圖上只到 ⑤，右邊也不寫 ⑥。沒有往下掉的階時兩版一樣。
 
-    圖面和 fig1_main(tau="axis") 相同，只是 Y 軸從 0% 開始（④ 從 0 量天花板的高度），
-    另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
+    圖面和 fig1_main(tau="axis") 相同，另外疊上：τ = 0.5 的讀圖路徑、每一個往下掉的階（▼）。
     不放 CPT 和隨機升級（以及拿隨機升級當基準的 APGR）：只留看懂藍線、綠線本身需要的東西。
     右邊的數字全部從 a 算，換資料、換 model 配對、換 router（ROUTER_NAME）都會跟著變，不是寫死的。
     乾淨版照舊產生；這張只是多一張，給第一次看圖的人。圖和文字分開的版本見 fig1_explained_split。
@@ -1249,10 +1298,15 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fi
             ax.set_ylim(lo, hi)
         elif tau == "axis":
             small_tau_axis(ax, a, c)
+        if y != "norm":  # norm 的 Y 是「補回 oracle 差距的比例」，天花板永遠是 1，箭頭沒有意義
+            draw_ceiling_arrows(ax, lo, hi, [a["ceiling"]], [c["ink2"]], a["acc_pow"], c,
+                                small=True, lw=0.9)
     handles = [
         plt.Line2D([], [], color=c["router"], lw=2.0, label=f"{ROUTER_NAME} model_route"),
         plt.Line2D([], [], color=c["oracle"], lw=1.3, label="Oracle (upper bound)"),
     ]
+    if y != "norm":
+        handles.append(ceiling_handle(c, zh=False))
     if random:
         handles.append(plt.Line2D([], [], color=c["muted"], lw=1.2, ls=(0, (5, 4)),
                                   label="Random"))
@@ -2217,12 +2271,12 @@ def _label_left_ends(ax, ma, models, c, lo, hi):
             ax.plot([-0.035, -0.014], [y_lab, y], color=c["muted"], lw=0.7, zorder=4)
 
 
-def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True, zero=False):
+def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True, ylim=None, small=False):
     """多個 fast 的藍線疊在同一張圖上。ma = {fast: analyse()}，必須是同一組題目。
 
-    粗線 = 該 fast 的 router 曲線，同色細線 = 該 fast 的 oracle，右端黑點 = 全送 powerful（共用）。
-    zero=True 時 Y 軸從 0% 開始（說明版要從 0 量天花板的高度）；否則從資料附近開始，看得到細節。
-    回傳 (Y 下限, Y 上限, 上方 τ 軸或 None)。
+    粗線 = 該 fast 的 router 曲線，同色細線 = 該 fast 的 oracle，右端黑點 = 全送 powerful（共用），
+    右端同色雙箭頭 = 各 fast 的天花板高度（從 Y 軸底畫起）。ylim 給了就用它（四格版各格自己放大），
+    small=True 是四格小圖用的箭頭尺寸。回傳 (Y 下限, Y 上限, 上方 τ 軸或 None)。
     """
     style_axes(ax, c)
     col = fast_colors(models, c)
@@ -2236,11 +2290,12 @@ def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True, zero=False):
     ax.plot([1], [ref["acc_pow"]], "o", ms=8, color=c["ink"], zorder=6,
             markeredgecolor=c["surface"], markeredgewidth=2)
 
-    lo = 0.0 if zero else \
-        min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values()) - 0.03
+    lo = min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values()) - 0.03
     ceil = max(a["ceiling"] for a in ma.values())
     # 上方留白跟著跨距放大（AIME 跨 50 分以上時，③ 的標記才不會頂到上方的 τ 刻度）
     hi = min(ceil + max(0.02, 0.07 * (ceil - lo)), max(1.0, ceil + 0.005))
+    if ylim is not None:
+        lo, hi = ylim
     ax.set_xlim(_gutter(models) if labels else -0.02, 1.02)
     ax.set_ylim(lo, hi)
     pct_axis(ax.yaxis)
@@ -2250,11 +2305,14 @@ def _cmp_curve_axes(ax, ma, models, c, labels=True, tau=True, zero=False):
     ax.set_ylabel("end-to-end accuracy", color=c["ink2"])
     if labels:
         _label_left_ends(ax, ma, models, c, lo, hi)
+    # 各 fast 的天花板高度：同色雙箭頭從 Y 軸底畫到天花板（說明版的 ④）
+    draw_ceiling_arrows(ax, lo, hi, [ma[m]["ceiling"] for m in models], [col[m] for m in models],
+                        ref["acc_pow"], c, small=small)
     axt = draw_tau_axis(ax, ref, c) if tau else None
     return lo, hi, axt
 
 
-def _cmp_legend(target, models, c, oracle=True, extra=(), **kw):
+def _cmp_legend(target, models, c, oracle=True, ceiling=True, extra=(), **kw):
     """圖例：第一列各 fast（照配色順序），第二列 oracle / 全送 powerful 這些共用的說明。
 
     matplotlib 的圖例是一欄一欄往下填的，所以把兩列交錯排好再交給它。
@@ -2270,6 +2328,8 @@ def _cmp_legend(target, models, c, oracle=True, extra=(), **kw):
     ref_h.append(plt.Line2D([], [], color=c["ink"], marker="o", ls="", ms=7,
                             label=t(f"全送 powerful（{ROUTE_POWERFUL}）",
                                     f"all powerful ({ROUTE_POWERFUL})")))
+    if ceiling:
+        ref_h.append(ceiling_handle(c))
     ref_h += list(extra)
     if len(models) <= 4 and len(ref_h) <= len(models):
         ncols = len(models)
@@ -2331,7 +2391,7 @@ def fig_multi_cost(ma, models, c, path, title=None):
     tau_h = plt.Line2D([], [], marker="o", ls="", ms=8, markerfacecolor=c["surface"],
                        markeredgecolor=c["ink2"], markeredgewidth=1.6,
                        label=t("τ = 0.5 的作業點", "τ = 0.5 operating point"))
-    _cmp_legend(ax, models, c, oracle=False, extra=[tau_h],  # 這張沒畫 oracle
+    _cmp_legend(ax, models, c, oracle=False, ceiling=False, extra=[tau_h],  # 這張沒畫 oracle
                 loc="upper center", bbox_to_anchor=(0.5, -0.12), fontsize=8.5)
     _save(fig, path, c)
 
@@ -2348,14 +2408,14 @@ def fig_multi_per_bench(mb, models, c, path):
     for ax, name in zip(axes.ravel(), names):
         ma = mb[name]
         ref = ma[models[0]]
-        _cmp_curve_axes(ax, ma, models, c, labels=False, tau=False)
+        # Y 範圍先算好再傳進去：天花板箭頭要畫到這格自己的 Y 軸底
         lo_d = min(min(a["acc_fast"], a["router"]["acc"].min()) for a in ma.values())
         hi_d = max(max(a["ceiling"], a["router"]["acc"].max()) for a in ma.values())
         pad_ = max((hi_d - lo_d) * 0.125, 0.002)
         lo, hi = max(0.0, lo_d - pad_), hi_d + pad_
         if hi_d < 1.0:
             hi = min(hi, 1.0)
-        ax.set_ylim(lo, hi)
+        _cmp_curve_axes(ax, ma, models, c, labels=False, tau=False, ylim=(lo, hi), small=True)
         ax.set_xlabel("")
         ax.set_ylabel("")
         ax.set_title(f"{name.upper()}　n = {ref['n']}　(Y span {hi - lo:.1%}, 1 item = {1 / ref['n']:.2%})",
@@ -2370,12 +2430,12 @@ def fig_multi_per_bench(mb, models, c, path):
 def _multi_explained_chart(ax, ma, models, c):
     """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。
 
-    Y 軸從 0% 開始：④ 量的是天花板的「高度」，箭頭要從 0 畫起才是真的高度。
-    曲線因此被壓扁，要看細節用不是說明版的 curve_tau_axis.png（Y 軸從資料附近開始）。
+    Y 軸從資料附近開始（不從 0）：各 fast 的差距只有幾個百分點，從 0 開始會被壓扁。
+    ④ 的箭頭從 Y 軸底畫到各自的天花板，下端用「≈」標出截掉了；箭頭上的短橫線是 ② 的高度。
     """
     col = fast_colors(models, c)
     ref = ma[models[0]]
-    lo, hi, axt = _cmp_curve_axes(ax, ma, models, c, zero=True)
+    lo, hi, axt = _cmp_curve_axes(ax, ma, models, c)
     ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（每個 fast 都一樣）", color=c["ink2"])
     ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
     axt.set_xlabel("上方 X 軸：門檻 τ（route_p ≥ τ 的題目送 powerful，和 fast 是誰無關）",
@@ -2397,19 +2457,9 @@ def _multi_explained_chart(ax, ma, models, c):
                 markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=6)
     top = max(models, key=lambda m: ma[m]["ceiling"])
     badge(ma[top]["knee"], ma[top]["ceiling"], 3, 18, 16)
-    # ④ 天花板的高度：右端每個 fast 一支同色雙箭頭，從 0% 量到自己的天花板。
-    # 每支都經過 ② 的高度：0 → ② 是 powerful 對 / N（每個 fast 一樣），
-    # ② 以上是只有 fast 對 / N（各自不同）—— 這一段就是各色天花板不一樣高的原因。
-    ap = ref["acc_pow"]
-    xs4 = [0.992 - 0.018 * i for i in range(len(models))]
-    for x4, m in zip(xs4, models):
-        ax.annotate("", (x4, 0.0), (x4, ma[m]["ceiling"]),
-                    arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.2,
-                                    shrinkA=0, shrinkB=0), zorder=4)
-    # 每支箭頭在 ② 的高度加一道短橫線，標出「powerful 對」和「只有 fast 對」的分界
-    # （畫在曲線上層：右端各條曲線都收斂到 ② 附近，虛線會被蓋掉）
-    ax.plot(xs4, [ap] * len(xs4), "_", ms=10, mew=2.0, color=c["ink"], zorder=7)
-    badge(min(xs4), ma[models[-1]]["ceiling"] / 2, 4, -22, 0)
+    # ④ 天花板的高度：各 fast 的同色雙箭頭（從 Y 軸底畫起、≈、② 的短橫線）_cmp_curve_axes 已經畫了，
+    # 這裡只放標記；放在最左邊那支箭頭的下段，中段常和各條曲線的右端、② 擠在一起
+    badge(min(ceiling_xs(len(models))), lo + 0.3 * (ma[models[-1]]["ceiling"] - lo), 4, -22, 0)
     # ⑤ τ = 0.5：從上方刻度往下，和每條線各交一點
     tp = tau_point(ref)
     x5 = tp["call"]
@@ -2464,10 +2514,10 @@ def _multi_explained_lines(ma, models):
         (0, "③ 同色細線 = 該 fast 的 oracle：事先知道答案，先升級「只有 powerful 對」的題目", "b"),
         (1, "轉折的橫軸位置 = 只有 powerful 對 / N：升級完這些題就到頂，再升級也不會更高", "b"),
         (0, "④ 天花板的高度 = (powerful 對 + 只有 fast 對) / N = (N - 兩個都錯) / N", "b"),
-        (1, "右端同色雙箭頭從 0% 量到各自的天花板（所以這張的 Y 軸從 0% 開始）", "b"),
-        (1, "0% → ②（箭頭上的短橫線）那一段 = powerful 對 / N：每個 fast 都一樣", "b"),
-        (1, "短橫線以上那一段 = 只有 fast 對 / N：powerful 錯、fast 對的題目，oracle 留給 fast", "b"),
-        (1, "powerful 一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
+        (1, "右端同色雙箭頭從 Y 軸底畫到各自的天花板；Y 軸沒有從 0% 開始，「≈」表示下面截掉了", "b"),
+        (1, "箭頭上的短橫線是 ② 的高度 = powerful 對 / N，每個 fast 都一樣", "b"),
+        (1, "短橫線以上 = 只有 fast 對 / N：powerful 錯、fast 對的題目，oracle 留給 fast", "b"),
+        (1, "② 一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
         (0, t_orc, "t"),
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
             f" = {pct1(tp0['call'])}，每個 fast 都升級這 {tp0['k']} 題", "b"),
