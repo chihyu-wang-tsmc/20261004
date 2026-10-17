@@ -54,6 +54,8 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     deep20_report/fig1_main_tau_axis.png    同上，門檻 τ 當上方第二條 X 軸（做法 B）
     deep20_report/fig1_main_tau_axis_conf.png  同上，上方同時標 τ 與 route_conf（做法 C2）
     deep20_report/fig1_main_tau_axis_<bench>.png   做法 B 的四個 bench 各一張（gpqa / ai2arc / aime / gsm8k）
+    deep20_report/fig1_main_tau_axis_explained.png / _<bench>_explained.png
+                                      同上的說明版：圖上標 1–7，右邊逐項寫出每個數字怎麼算（需要中文字型）
     deep20_report/fig2_per_bench.png  正文圖 2：四個 bench 分開看
     deep20_report/fig2_per_bench_tau_curve.png / _tau_axis.png   同上的兩種 τ 版本
     deep20_report/fig2_per_bench_zoom.png   同上，Y 軸每格各自從藍線附近開始（跨距各格不同）
@@ -676,6 +678,10 @@ def analyse(data, n_boot):
         "quad": quadrants(data),
         "class_curve": classification_curve(data),
     }
+    # 依 route_p 由高到低（= 藍線的升級順序）排好的逐題資料，fig1_explained 拿來逐項拆解
+    order = np.argsort(-data.p, kind="stable")
+    a["sorted"] = {"p": data.p[order], "delta": (data.cp - data.cf)[order],
+                   "kf": data.kf[order], "kp": data.kp[order]}
     a["cal"], a["ece"], a["mce"], a["cal_n"] = calibration(data, include_none=False)
     _, a["ece_incl"], _, _ = calibration(data, include_none=True)
     a["n_boot"] = n_boot
@@ -829,8 +835,19 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
     """
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8.4, 5.4))
+    _fig1_axes(ax, a, c, band=band, random=random, tau=tau, title=title)
+    # 圖例放在繪圖區外（下方），不壓到資料
+    n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
+              labelcolor=c["ink2"], fontsize=8.5)
+    _save(fig, path, c)
+
+
+def _fig1_axes(ax, a, c, band=False, random=False, tau=None, title=None):
+    """圖 1 畫在 ax 上的部分（fig1_main 和 fig1_explained 共用）。回傳 (Y 下限, Y 上限, 上方 τ 軸)。"""
     style_axes(ax, c)
     r, o, d, s = a["router"], a["oracle"], a["random"], a["star"]
+    axt = None
 
     if band and a["lo"] is not None:
         ax.fill_between(GRID, a["lo"], a["hi"], color=c["band"], alpha=0.16, linewidth=0,
@@ -871,15 +888,189 @@ def fig1_main(a, c, path, band=False, random=False, tau=None, title=None):
         ax.set_xlim(-0.02, 1.02)   # 畫記號可能撐開範圍，設回來
         ax.set_ylim(lo, hi)
     elif tau in ("axis", "axis-conf"):
-        draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
+        axt = draw_tau_axis(ax, a, c, conf=(tau == "axis-conf"))
     if title:  # 上方有 τ 刻度時要讓開它（axis-conf 還多一行刻度和軸標題）
         ax.set_title(title, color=c["ink"], fontsize=11, loc="left",
                      pad={"axis": 22, "axis-conf": 48}.get(tau, 8))
+    return lo, hi, axt
 
-    # 圖例放在繪圖區外（下方），不壓到資料
-    n_items = 2 + int(band and a["lo"] is not None) + int(random) + int(tau == "curve")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncols=n_items,
-              labelcolor=c["ink2"], fontsize=8.5)
+
+def fig1_explained(a, c, path, name):
+    """圖 1（上方標 τ）的說明版：圖上用 1–7 標出每個數字的位置，右邊逐項寫出怎麼算。
+
+    圖面和 fig1_main(tau="axis") 相同，另外疊上：隨機升級的斜線（APGR 和 ⑤ 要拿它比）、
+    τ = 0.5 的讀圖路徑、CPT(95%) 的目標線、每一個往下掉的階（▼）。右邊的數字全部從 a 算，
+    換資料、換 model 配對、換 router（ROUTER_NAME）都會跟著變，不是寫死的。
+    乾淨版照舊產生；這張只是多一張，給第一次看圖的人。
+    """
+    import matplotlib.pyplot as plt
+    n, q, srt = a["n"], a["quad"], a["sorted"]
+    r = a["router"]
+    af, ap, ceil = a["acc_fast"], a["acc_pow"], a["ceiling"]
+    delta, p = srt["delta"], srt["p"]
+
+    fig = plt.figure(figsize=(17.5, 9.8))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.18, 1], wspace=0.05,
+                          left=0.05, right=0.99, top=0.88, bottom=0.14)
+    ax, ax_t = fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
+    lo, hi, axt = _fig1_axes(ax, a, c, random=True, tau="axis")
+    ax.set_xlabel("下方 X 軸：powerful 呼叫比例 k / N（上行）／這個作業點的 $ 每千題（下行）",
+                  color=c["ink2"])
+    ax.set_ylabel("Y 軸：end-to-end 正確率", color=c["ink2"])
+    axt.set_xlabel("上方 X 軸：門檻 τ（route_p ≥ τ 的題目送 powerful）", color=c["ink2"],
+                   labelpad=6)
+    fig.suptitle(f"{name}　N = {n}　怎麼讀這張圖", x=0.05, y=0.975, ha="left",
+                 color=c["ink"], fontsize=15)
+
+    def badge(x, y, num, dx, dy):
+        ax.annotate(str(num), (x, y), xytext=(dx, dy), textcoords="offset points",
+                    ha="center", va="center", color=c["ink"], fontsize=10, zorder=9,
+                    bbox=dict(boxstyle="circle,pad=0.25", fc=c["surface"], ec=c["ink2"], lw=0.9),
+                    arrowprops=dict(arrowstyle="-", color=c["ink2"], lw=0.7))
+
+    # ①② 兩端點 ③ oracle 轉折 ④ 綠線右端和 ② 的差
+    badge(0, af, 1, 22, -22)
+    badge(1, ap, 2, -22, -24)
+    knee = a["knee"]
+    ax.plot([knee], [ceil], "o", ms=6, color=c["oracle"], markeredgecolor=c["surface"],
+            markeredgewidth=1.5, zorder=6)
+    badge(knee, ceil, 3, 18, 16)
+    if q["fast_only"]:
+        ax.annotate("", (0.992, ap), (0.992, ceil),
+                    arrowprops=dict(arrowstyle="<->", color=c["ink2"], lw=0.9, shrinkA=0, shrinkB=0))
+        badge(0.992, (ap + ceil) / 2, 4, -22, 0)
+
+    # ⑤ τ = 0.5：從上方刻度往下對到藍線，再往左讀 Y、往下讀 X
+    k5 = int((p >= 0.5).sum())
+    x5, y5 = r["call"][k5], r["acc"][k5]
+    rnd5 = af + x5 * (ap - af)
+    path_kw = dict(color=c["ink2"], lw=0.9, ls=(0, (1.5, 2.5)), zorder=2)
+    ax.plot([x5, x5], [hi, lo], **path_kw)
+    ax.plot([-0.02, x5], [y5, y5], **path_kw)
+    ax.plot([x5], [y5], "o", ms=12, markerfacecolor="none", markeredgecolor=c["ink"],
+            markeredgewidth=1.4, zorder=7)
+    ax.plot([x5], [rnd5], "o", ms=6, markerfacecolor=c["surface"], markeredgecolor=c["muted"],
+            markeredgewidth=1.3, zorder=6)
+    badge(x5, y5, 5, 20, 18)
+
+    # ⑥ CPT(95%)：目標線，和藍線第一次碰到它的點（目標在畫面外就不畫線，右邊照樣寫出來）
+    target = 0.95 * ap
+    cpt = a["cpt"][0.95]
+    k_cpt = None if math.isnan(cpt) else int(round(cpt * n))
+    if lo < target < hi:
+        ax.axhline(target, color=c["muted"], lw=0.9, ls=(0, (5, 3)), zorder=1)
+        if k_cpt:
+            ax.plot([r["call"][k_cpt]], [r["acc"][k_cpt]], "s", ms=7, markerfacecolor="none",
+                    markeredgecolor=c["ink"], markeredgewidth=1.3, zorder=7)
+            badge(r["call"][k_cpt], r["acc"][k_cpt], 6, 22, -20)
+        else:
+            badge(0.5, target, 6, 0, -14)
+
+    # ⑦ 每一個往下掉的階：升級到「fast 對、powerful 錯」的題目
+    down = np.where(delta < 0)[0]
+    if len(down):
+        ax.plot(r["call"][down + 1], r["acc"][down + 1], "v", ms=7, color=c["mark"],
+                markeredgecolor=c["surface"], markeredgewidth=1.0, zorder=6)
+        mid = down[np.argmin(np.abs(r["call"][down + 1] - 0.5))]
+        badge(r["call"][mid + 1], r["acc"][mid + 1], 7, 0, -26)
+
+    handles = [
+        plt.Line2D([], [], color=c["router"], lw=2.2, label=f"{ROUTER_NAME} model_route"),
+        plt.Line2D([], [], color=c["oracle"], lw=1.6, label="Oracle（上界）"),
+        plt.Line2D([], [], color=c["muted"], lw=1.4, ls=(0, (5, 4)), label="隨機升級"),
+        plt.Line2D([], [], color=c["mark"], marker="v", ls="", ms=7, label="往下一階"),
+    ]
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncols=4,
+              labelcolor=c["ink2"], fontsize=9)
+
+    # ---------------------------------------------------------------- 右邊：逐項推導
+    ax_t.axis("off")
+    pct1 = lambda v: f"{v:.1%}"
+    # 一題的份量在大 N 時不到 0.1%（AI2ARC 1/3548），印成 0.0% 會被讀成「沒影響」
+    pct_s = lambda v: f"{v:.2%}" if 0 < abs(v) < 0.01 else f"{v:.1%}"
+    up5, dn5 = int((delta[:k5] > 0).sum()), int((delta[:k5] < 0).sum())
+    pow5, fast5 = srt["kp"][:k5].sum(), srt["kf"][k5:].sum()
+    need = math.ceil(target * n - 1e-9)
+    pr = PRICES
+    # (縮排層級, 文字, 樣式)：h = 小標題、b = 本文、m = 次要、math = 含數學式的本文。
+    # 金額的 $ 一多，matplotlib 會把兩個 $ 之間當數學式，所以 b / m 的 $ 一律跳脫；
+    # 只有 math 樣式照原樣（裡面的金額自己寫成 \$）
+    lines = [
+        (0, f"fast = {ROUTE_FAST}　powerful = {ROUTE_POWERFUL}　router = {ROUTER_NAME}", "m"),
+        (0, "兩個 model 對 N 題各答一次的結果", "h"),
+        (0, "TABLE", "t"),
+        (0, "圖上 1–7 的數字怎麼來", "h"),
+        (0, f"① 全送 fast（左端黑點）= ({q['both']} + {q['fast_only']}) / {n} = {pct1(af)}", "b"),
+        (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b"),
+        (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b"),
+        (1, f"在 {q['pow_only']} / {n} = {pct1(knee)} 到頂，"
+            f"天花板 = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b"),
+    ]
+    if q["fast_only"]:
+        lines.append((0, f"④ 綠線比 ② 高 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
+                         f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 不升級", "b"))
+    lines += [
+        (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {k5} 題 → {k5} / {n} = {pct1(x5)}", "b"),
+        (1, f"其中 +1 有 {up5} 題、-1 有 {dn5} 題 → {pct1(af)} + ({up5} - {dn5}) / {n} = {pct1(y5)}", "b"),
+        (1, f"同樣 {pct1(x5)} 隨機升級（灰圈）：{pct1(af)} + {pct1(x5)} × ({pct1(ap)} - {pct1(af)})"
+            f" = {pct1(rnd5)}", "b"),
+        (1, f"$ = (前 {k5} 題 powerful ${pow5:.4f} + 其餘 {n - k5} 題 fast ${fast5:.4f}) / {n} × 1000"
+            f" = ${r['cost'][k5] * 1000:.2f}", "b"),
+    ]
+    if k_cpt is None:
+        lines.append((0, f"⑥ CPT(95%)：目標 0.95 × {pct1(ap)} = {pct1(target)}，藍線達不到", "b"))
+    elif k_cpt == 0:
+        lines.append((0, f"⑥ CPT(95%)：目標 0.95 × {pct1(ap)} = {pct1(target)}，"
+                         f"全送 fast（{pct1(af)}）已達標 → 0%", "b"))
+    else:
+        lines += [
+            (0, f"⑥ CPT(95%)：目標 0.95 × {pct1(ap)} = {pct1(target)}，至少答對 {need} 題", "b"),
+            (1, f"藍線在 k = {k_cpt}（{k_cpt} / {n} = {pct1(cpt)}）第一次達到（方框）", "b"),
+        ]
+    lines += [
+        (0, f"⑦ ▼ 升級到「fast 對、powerful 錯」的題目，正確率掉 1 / {n} = {pct_s(1 / n)}"
+            f"（共 {q['fast_only']} 題）", "b"),
+        (0, f"APGR = {a['apgr']:.2f}：(藍線 - 隨機線) 的面積 ÷ (綠線 - 隨機線) 的面積", "b"),
+        (1, "0 = 和隨機升級一樣，1 = 和 oracle 一樣", "m"),
+        (0, "三條軸", "h"),
+        (0, "Y　照門檻分派後，N 題最後答對的比例（不是 router 選對的比例）", "b"),
+        (1, r"藍線 $A(k) = A_F + (1/N)\,\Sigma_{j \leq k}\,(y_P - y_F)$，每一項是 +1、0 或 -1", "math"),
+        (0, "下方 X 上行　呼叫比例 = k / N，k = 送 powerful 的題數", "b"),
+        (0, r"下方 X 下行　\$(k) = [ Σ前 k 題 cost$_P$ + Σ其餘 cost$_F$ ] / N × 1000", "math"),
+        (1, "每題 cost = 輸入 token × 輸入單價 + 輸出 token × 輸出單價（實際用量）", "b"),
+        (1, f"單價（$ / 百萬 token，輸入 / 輸出）：fast {pr['fast']['in']:g} / {pr['fast']['out']:g}，"
+            f"powerful {pr['powerful']['in']:g} / {pr['powerful']['out']:g}", "b"),
+        (1, f"平均每千題：fast ${a['cost_fast'] * 1000:.2f}，powerful ${a['cost_pow'] * 1000:.2f}"
+            "；不含守門開銷；照藍線的升級順序算，只適用藍線", "b"),
+        (0, f"上方 X　門檻 τ：route_p ≥ τ 的題目送 powerful（route_p = {ROUTER_NAME} 給 powerful 的機率）", "b"),
+        (1, "刻度位置 = route_p ≥ τ 的題數 / N："
+            + "、".join(f"{tv:g} → {int((p >= tv).sum())} 題" for tv in (0.9, 0.7, 0.5, 0.3, 0.1)), "b"),
+        (0, "怎麼讀", "h"),
+        (0, "上方選一個 τ → 往下對到藍線讀 Y → 再往下讀呼叫比例與 $（⑤ 的點線就是一例）", "b"),
+    ]
+    if PRICES_ARE_PLACEHOLDER:
+        lines.append((0, "注意：PRICES 還是示意單價，所有 $ 的數字都不能引用", "b"))
+
+    y, step = 1.0, 0.0262
+    for indent, text, style in lines:
+        if style == "h":
+            y -= step * 0.55
+            ax_t.text(0, y, text, transform=ax_t.transAxes, va="top", color=c["ink"], fontsize=11.5)
+            y -= step * 1.15
+            continue
+        if style == "t":  # 2×2 的對錯表
+            cols, xs = ("", "powerful 對", "powerful 錯"), (0.02, 0.24, 0.42)
+            rows = [cols, ("fast 對", q["both"], q["fast_only"]), ("fast 錯", q["pow_only"], q["none"])]
+            for i, row in enumerate(rows):
+                for x, cell in zip(xs, row):
+                    ax_t.text(x, y - i * step, str(cell), transform=ax_t.transAxes, va="top",
+                              color=c["ink"] if i and x > 0.1 else c["ink2"], fontsize=10)
+            y -= step * len(rows)
+            continue
+        ax_t.text(0.03 * indent, y, text if style == "math" else text.replace("$", r"\$"),
+                  transform=ax_t.transAxes, va="top", fontsize=9.6,
+                  color=c["muted"] if style == "m" else c["ink"])
+        y -= step
     _save(fig, path, c)
 
 
@@ -1557,6 +1748,15 @@ def cmd_report(args):
             for name, b in per_bench.items():
                 fig1_main(b, c, os.path.join(args.out, f"fig1_main_tau_axis_{name}{sfx}.png"),
                           tau=variant, title=f"{name.upper()}　n = {b['n']}", **kw)
+            # 說明版：圖上標 1–7，右邊逐項推導。全是中文，沒有 CJK 字型就不畫（不要變豆腐）
+            if ZH:
+                fig1_explained(a, c, os.path.join(
+                    args.out, f"fig1_main_tau_axis_explained{sfx}.png"), "合計")
+                for name, b in per_bench.items():
+                    fig1_explained(b, c, os.path.join(
+                        args.out, f"fig1_main_tau_axis_{name}_explained{sfx}.png"), name.upper())
+            else:
+                print("  [skip] fig1_main_tau_axis_*_explained：找不到中文字型")
         # axis-conf 的刻度有兩行，四格小圖放不下，所以 fig2 不出這個變體
         # 曲線上的 τ 記號畫的是原始正確率，所以 norm 版只出 axis
         if variant != "axis-conf":
