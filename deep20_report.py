@@ -93,7 +93,7 @@ router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣�
         cost[_<bench>].png                  X 換成 $ 每千題（各 fast 的 $ 不同，不能共用呼叫比例軸）
         per_bench_tau_axis.png              四個 bench 各一格
         curve_tau_axis[_<bench>]_explained.png / _explained_chart.png / _explained.txt
-                                            說明版（圖上標 1–4、右邊逐項推導）與拆開的圖／文字
+                                            說明版（圖上標 1–5、右邊逐項推導）與拆開的圖／文字
         tables.xlsx                         各 fast × 各 bench 的摘要、作答覆蓋、曲線、逐題資料
         <fast>/                             每個 fast 單一 fast 的 fig1_main_tau_axis 與說明版
                                             （--per-fast full 時是和 report 一樣的整套）
@@ -1038,12 +1038,13 @@ def _explained_lines(a, show_drops):
         (0, f"① 全送 fast（左端黑點）= ({q['both']} + {q['fast_only']}) / {n} = {pct1(af)}", "b", None),
         (0, f"② 全送 powerful（右端黑點）= ({q['both']} + {q['pow_only']}) / {n} = {pct1(ap)}", "b", None),
         (0, f"③ Oracle：事先知道答案，先升級 {q['pow_only']} 題「只有 powerful 對」", "b", None),
-        (1, f"在 {q['pow_only']} / {n} = {pct1(knee)} 到頂，"
-            f"天花板 = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
+        (1, f"轉折在 {q['pow_only']} / {n} = {pct1(knee)}：升級完這 {q['pow_only']} 題就到頂", "b", None),
+        (1, f"天花板 = (powerful 對 {q['both'] + q['pow_only']} + 只有 fast 對 {q['fast_only']}) / {n}"
+            f" = ({n} - {q['none']} 題兩個都錯) / {n} = {pct1(ceil)}", "b", None),
     ]
     if q["fast_only"]:
         lines.append((0, f"④ 綠線比 ② 高 {q['fast_only']} / {n} = {pct_s(ceil - ap)}："
-                         f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 不升級", "b", None))
+                         f"{q['fast_only']} 題 fast 對、powerful 錯，oracle 留給 fast、不升級", "b", None))
     lines += [
         (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {k5} 題 → {k5} / {n} = {pct1(x5)}", "b", None),
         (1, f"其中 +1 有 {up5} 題、-1 有 {dn5} 題 → {pct1(af)} + ({up5} - {dn5}) / {n} = {pct1(y5)}",
@@ -2347,7 +2348,7 @@ def fig_multi_per_bench(mb, models, c, path):
 
 # ---- 說明版 ----
 def _multi_explained_chart(ax, ma, models, c):
-    """說明版左邊的圖：多 fast 疊圖 + ①–④ 的標記 + τ = 0.5 的讀圖路徑。"""
+    """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。"""
     col = fast_colors(models, c)
     ref = ma[models[0]]
     lo, hi, axt = _cmp_curve_axes(ax, ma, models, c)
@@ -2366,13 +2367,27 @@ def _multi_explained_chart(ax, ma, models, c):
     low = min(models, key=lambda m: ma[m]["acc_fast"])
     badge(0, ma[low]["acc_fast"], 1, 24, -22)
     badge(1, ref["acc_pow"], 2, -22, -24)
-    # ③ 每條 oracle 的轉折點
+    # ③ 每條 oracle 的轉折點：橫軸位置 = 只有 powerful 對 / N
     for m in models:
         ax.plot([ma[m]["knee"]], [ma[m]["ceiling"]], "o", ms=6, color=col[m],
                 markeredgecolor=c["surface"], markeredgewidth=1.5, zorder=6)
     top = max(models, key=lambda m: ma[m]["ceiling"])
     badge(ma[top]["knee"], ma[top]["ceiling"], 3, 18, 16)
-    # ④ τ = 0.5：從上方刻度往下，和每條線各交一點
+    # ④ 天花板比 ② 高的那一段 = 只有 fast 對 / N：右端每個 fast 一支同色雙箭頭，從 ② 量到自己的天花板。
+    # 天花板的高度不只看「只有 powerful 對」，這一段就是各色天花板不一樣高的原因。
+    ap = ref["acc_pow"]
+    xs4 = []
+    for i, m in enumerate(models):
+        if ma[m]["quad"]["fast_only"]:
+            x4 = 0.992 - 0.016 * i
+            xs4.append((x4, m))
+            ax.annotate("", (x4, ap), (x4, ma[m]["ceiling"]),
+                        arrowprops=dict(arrowstyle="<->", color=col[m], lw=1.1,
+                                        shrinkA=0, shrinkB=0), zorder=6)
+    if xs4:
+        x4, m4 = min(xs4)  # 最左邊那支旁邊放 ④
+        badge(x4, (ap + ma[m4]["ceiling"]) / 2, 4, -22, 0)
+    # ⑤ τ = 0.5：從上方刻度往下，和每條線各交一點
     tp = tau_point(ref)
     x5 = tp["call"]
     ax.plot([x5, x5], [hi, lo], color=c["ink2"], lw=0.9, ls=(0, (1.5, 2.5)), zorder=2)
@@ -2382,7 +2397,7 @@ def _multi_explained_chart(ax, ma, models, c):
         ys.append(y5)
         ax.plot([x5], [y5], "o", ms=10, markerfacecolor="none", markeredgecolor=col[m],
                 markeredgewidth=1.6, zorder=7)
-    badge(x5, max(ys), 4, 20, 18)
+    badge(x5, max(ys), 5, 20, 18)
 
     _cmp_legend(ax, models, c, loc="upper center", bbox_to_anchor=(0.5, -0.11), fontsize=9)
 
@@ -2399,27 +2414,38 @@ def _multi_explained_lines(ma, models):
           ("fast", "兩個都對", "只有 fast 對", "只有 powerful 對", "兩個都錯"),
           *[(m, ma[m]["quad"]["both"], ma[m]["quad"]["fast_only"], ma[m]["quad"]["pow_only"],
              ma[m]["quad"]["none"]) for m in models])
+    # ③ 轉折和 ④ 天花板各自怎麼算：轉折只看「只有 powerful 對」，天花板還要加上「只有 fast 對」
+    t_orc = ((0.035, 0.27, 0.58),
+             ("fast", "③ 轉折 = 只有 powerful 對 / N", "④ 天花板 = (powerful 對 + 只有 fast 對) / N"),
+             *[(m, f"{ma[m]['quad']['pow_only']} / {n} = {pct1(ma[m]['knee'])}",
+                f"({n_pow} + {ma[m]['quad']['fast_only']}) / {n} = {pct1(ma[m]['ceiling'])}")
+               for m in models])
     rows2 = []
     for m in models:
         a, tp = ma[m], tau_point(ma[m])
-        rows2.append((m, pct1(a["acc_fast"]), pct1(a["ceiling"]), pct1(a["knee"]),
-                      f"{tp['up']} / {tp['down']}", pct1(tp["acc"]), f"${tp['cost'] * 1000:,.2f}"))
-    t2 = ((0.035, 0.28, 0.40, 0.51, 0.62, 0.75, 0.87),
-          ("fast", "① 全送 fast", "③ 天花板", "③ 轉折", "④ +1 / -1", "④ 正確率", "④ $/千題"),
+        rows2.append((m, pct1(a["acc_fast"]), f"{tp['up']} / {tp['down']}", pct1(tp["acc"]),
+                      f"${tp['cost'] * 1000:,.2f}"))
+    t2 = ((0.035, 0.30, 0.47, 0.64, 0.81),
+          ("fast", "① 全送 fast", "⑤ +1 / -1", "⑤ 正確率", "⑤ $/千題"),
           *rows2)
     lines = [
         (0, f"powerful = {ROUTE_POWERFUL}（固定）　router = {ROUTER_NAME}　fast 比 {len(models)} 個", "m"),
         (0, f"N = {n} 題：每個 fast 和 powerful 都有有效作答的交集", "m"),
         (0, "每個 fast 和 powerful 對 N 題各答一次的結果", "h"),
         (0, t1, "t"),
-        (0, "圖上 1–4 的數字怎麼來", "h"),
+        (0, "圖上 1–5 的數字怎麼來", "h"),
         (0, "① 各色左端點 = 全送該 fast =（兩個都對 + 只有 fast 對）/ N", "b"),
         (0, f"② 右端黑點 = 全送 powerful =（兩個都對 + 只有 powerful 對）/ N = {n_pow} / {n}"
             f" = {pct1(ref['acc_pow'])}", "b"),
         (1, "這兩格加起來就是 powerful 答對的題數，和 fast 是誰無關，所以只有一個黑點", "b"),
         (0, "③ 同色細線 = 該 fast 的 oracle：事先知道答案，先升級「只有 powerful 對」的題目", "b"),
-        (1, "轉折 = 只有 powerful 對 / N，天花板 = (N - 兩個都錯) / N", "b"),
-        (0, f"④ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
+        (1, "轉折的橫軸位置 = 只有 powerful 對 / N：升級完這些題就到頂，再升級也不會更高", "b"),
+        (0, "④ 天花板的高度 = (powerful 對 + 只有 fast 對) / N = (N - 兩個都錯) / N", "b"),
+        (1, "「只有 fast 對」= powerful 錯、fast 對的題目，oracle 把它們留給 fast", "b"),
+        (1, "→ 天花板比 ② 高「只有 fast 對」/ N（右端的同色雙箭頭）", "b"),
+        (1, "powerful 一樣，但每個 fast 能補回 powerful 的錯題數不同 → 各色天花板不一樣高", "b"),
+        (0, t_orc, "t"),
+        (0, f"⑤ τ = 0.5（現行 argmax）：route_p ≥ 0.5 有 {tp0['k']} 題 → {tp0['k']} / {n}"
             f" = {pct1(tp0['call'])}，每個 fast 都升級這 {tp0['k']} 題", "b"),
         (1, "正確率 = ① + (+1 題數 - -1 題數) / N；$ = (這幾題 powerful + 其餘 fast) / N × 1000", "b"),
         (0, t2, "t"),
@@ -2438,7 +2464,7 @@ def _multi_explained_lines(ma, models):
         (0, f"powerful {ROUTE_POWERFUL}　{PRICES['powerful']['in']:g} / {PRICES['powerful']['out']:g}"
             f"　${ref['cost_pow'] * 1000:,.2f}；不含守門開銷", "b"),
         (0, "怎麼讀", "h"),
-        (0, "上方選一個 τ → 往下對到各色線 → 同一個 τ 下線越高，那個 fast 越好（④ 的點線就是一例）", "b"),
+        (0, "上方選一個 τ → 往下對到各色線 → 同一個 τ 下線越高，那個 fast 越好（⑤ 的點線就是一例）", "b"),
     ]
     if PRICES_ARE_PLACEHOLDER:
         lines.append((0, "注意：PRICES 還是示意單價，所有 $ 的數字都不能引用", "b"))
@@ -2476,7 +2502,7 @@ def _draw_multi_lines(ax_t, lines, models, c):
 
 
 def fig_multi_explained(ma, models, c, path, name):
-    """多 fast 的說明版：左邊疊圖標 ①–④，右邊逐項寫出每個 fast 的數字怎麼算。"""
+    """多 fast 的說明版：左邊疊圖標 ①–⑤，右邊逐項寫出每個 fast 的數字怎麼算。"""
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(17.5, 9.8))
     gs = fig.add_gridspec(1, 2, width_ratios=[1.18, 1], wspace=0.05,
