@@ -65,7 +65,7 @@
 | --- | --- | --- |
 | MTCS | MCTS | Monte Carlo Tree Search 的誤植 |
 | 零件故障排固案例 | 零件故障排除案例 | 錯字 |
-| 可以發 Run car 的條件 | 可以發 run card 的條件 | 推測是 fab 的 run card |
+| 可以發 Run car 的條件 | 可以發 run card 的條件 | 錯字，指 fab 的 run card |
 | 劇情文本、劇本事實、每一集的 meta | 案例文本、案例事實、每個案例的 metadata | 講者用影集當比喻，換成實際場景的說法 |
 | 三元子句 | 三元組（triple） | 圖資料庫的慣用說法 |
 | Topology Relational / Logic | Topology / Relational Logic | 與第一張名稱統一 |
