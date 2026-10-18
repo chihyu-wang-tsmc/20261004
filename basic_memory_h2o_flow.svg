@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1264" height="2578" viewBox="0 0 1264 2578" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" role="img" aria-label="basic_memory_h2o.py 程式流程：載入模組時建好 H2OClassifier（with_retry）、json_cache、空的 MEMORIES、DATA、ROUTE 和 GATE。main() 照官網筆記本：① 印第一張單；② 不帶記憶問一次分派；③ 五張舊單依序送進 ask_with_memory()，每張之後用兩則新訊息看分派怎麼變；④ 六則新訊息各問一次不帶記憶、一次帶記憶，跟標準答案比；⑤ 寫 playground.json；⑥ 跟官網 Jev 對照。ask_with_memory() 先取出這個客戶的記憶，有記憶就放進 state，第 1 問分派（Choice），再把原 state 和答案組成 memory 問 gate（Noul），P(remember) ≥ 0.5 才存進 MEMORIES，最後回傳第 1 問的答案。ask() 先查快取，沒有才 POST 到本機 h2o-lightning，失敗依 with_retry 重試或拋出例外，_parse 之後寫回快取。">
+<defs><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4a5160"/></marker><marker id="agr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d8656"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2c55c9"/></marker><marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7b3fa0"/></marker></defs>
+<rect x="0" y="0" width="1264" height="2578" fill="#ffffff"/>
+<rect x="36" y="792" width="520" height="584" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<rect x="36" y="1416" width="520" height="666" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<rect x="24" y="512" width="544" height="1966" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<rect x="604" y="196" width="644" height="942" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<rect x="604" y="1178" width="644" height="974" rx="12" fill="none" stroke="#9aa1ad" stroke-width="1.3" stroke-dasharray="7 5"/>
+<polyline points="296,148 296,174" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,318 296,342" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,486 296,574" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,646 296,670" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,766 296,854" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,950 296,974" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1032 296,1056" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="296,1128 296,1152" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1248 296,1272" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1344 296,1360 44,1360 44,1004 134,1004" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="456,1004 548,1004 548,1390 296,1390" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<polyline points="296,1390 296,1478" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1536 296,1560" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="296,1656 296,1680" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1738 296,1762" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="416,1710 500,1710 500,1872 296,1872" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<polyline points="296,1858 296,1882" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,1954 296,1978" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,2050 296,2066 44,2066 44,1508 144,1508" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="446,1508 548,1508 548,2096 296,2096" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<polyline points="296,2096 296,2120" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,2192 296,2216" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,2312 296,2336" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="296,2456 296,2502" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,332 800,356" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,402 800,426" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="930,380 1150,380 1150,512 800,512" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<polyline points="800,498 800,522" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,594 800,618" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,714 800,738" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,858 800,882" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,940 800,964" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="930,912 1150,912 1150,1050 800,1050" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<polyline points="800,1036 800,1060" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="540,903 586,903 586,226 602,226" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#ab)"/>
+<polyline points="540,1093 586,1093 586,226 602,226" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<polyline points="540,1309 586,1309 586,226 602,226" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<polyline points="540,1919 586,1919 586,226 602,226" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<polyline points="800,1380 800,1404" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="950,1434 978,1434" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="800,1462 800,1494" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,1566 800,1590" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,1686 800,1740" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="920,1764 978,1764" fill="none" stroke="#c0392b" stroke-width="1.7" marker-end="url(#ar)"/>
+<polyline points="1100,1717 1100,1688" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="1100,1811 1100,1835" fill="none" stroke="#c0392b" stroke-width="1.7" marker-end="url(#ar)"/>
+<polyline points="800,1786 800,1810" fill="none" stroke="#1d8656" stroke-width="1.7" marker-end="url(#agr)"/>
+<polyline points="800,1954 800,1978" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="800,2050 800,2074" fill="none" stroke="#4a5160" stroke-width="1.7" marker-end="url(#ag)"/>
+<polyline points="1212,559 1232,559 1232,1176" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<polyline points="1212,799 1232,799 1232,1176" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#ab)"/>
+<rect x="126.0" y="104" width="340" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="296" y="131.5" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">python basic_memory_h2o.py</text>
+<rect x="40" y="176" width="512" height="142" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="204" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">載入模組（import 時就做）</text>
+<text x="56" y="228" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">client = H2OClassifier(timeout=120).with_retry(...)</text>
+<text x="56" y="252" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">with_retry：失敗最多試 6 次，每次間隔 1～20 秒</text>
+<text x="56" y="276" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">json_cache：讀 basic_memory_h2o/json_cache.json，沒有就從空的開始</text>
+<text x="56" y="300" fill="#7b3fa0" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">MEMORIES = {}：客戶 ID → 這個客戶存下的記憶（只在記憶體裡）</text>
+<rect x="40" y="344" width="512" height="142" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="372" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">題目和資料（也是 import 時就建好）</text>
+<text x="56" y="396" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">DATA：2 個客戶、5 張舊單 T-101～T-105、3 則新訊息、標準答案</text>
+<text x="56" y="420" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">ticket_state()：每張單變成 state = {customer, ticket}</text>
+<text x="56" y="444" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">ROUTE：一題 Choice「哪個客服組該處理 ticket？」，7 個組別</text>
+<text x="56" y="468" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">GATE：一題 Noul「request.ticket 有沒有說出長期不變的事實？」</text>
+<rect x="40" y="576" width="512" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="604" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">① Define the tickets</text>
+<text x="56" y="628" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">印出 EARLIER[0]：T-101 在 h2o 眼中的 state（customer + ticket）</text>
+<rect x="40" y="672" width="512" height="94" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="56" y="700" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">② Route a ticket：ask(slow, ROUTE)</text>
+<text x="56" y="724" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">slow = C-1042 的第 1 則新訊息 T-201（Slow dashboards）</text>
+<text x="56" y="748" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不帶記憶直接問，印出組別和機率（官網 Jev：cloud_ops 0.80）</text>
+<rect x="52" y="856" width="488" height="94" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="68" y="884" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">send_probes(兩個客戶)：記憶都還是 none</text>
+<text x="68" y="908" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">PROBES：Slow dashboards、More seats 兩則新訊息</text>
+<text x="68" y="932" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">每則走一次 ask_with_memory()，印 組別 機率</text>
+<rect x="136.0" y="976" width="320" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="296" y="1001" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">還有下一張舊單嗎？</text>
+<text x="296" y="1020" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">T-101 → T-105，照收到的順序</text>
+<rect x="52" y="1058" width="488" height="70" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="68" y="1086" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">ask_with_memory(舊單, ROUTE)</text>
+<text x="68" y="1110" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">分派 + gate；P(remember) ≥ 0.5 就存成這個客戶的記憶</text>
+<rect x="52" y="1154" width="488" height="94" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="68" y="1182" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">p = remember_probability(as_memory(…))</text>
+<text x="68" y="1206" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">跟 wrapper 裡的第 2 問同一組請求，直接讀快取，不會再問 h2o</text>
+<text x="68" y="1230" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">印：單號、組別、P(remember)、saved / not saved</text>
+<rect x="52" y="1274" width="488" height="70" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="68" y="1302" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">印目前的記憶 → send_probes(這個客戶)</text>
+<text x="68" y="1326" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">同樣兩則新訊息再問一次，看剛存的記憶有沒有改變分派</text>
+<rect x="146.0" y="1480" width="300" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="296" y="1505" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">還有下一則嗎？</text>
+<text x="296" y="1524" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">2 個客戶 × 3 則新訊息 = 6 則</text>
+<rect x="52" y="1562" width="488" height="94" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="68" y="1590" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">plain = ask(state, ROUTE)：不帶記憶</text>
+<text x="68" y="1614" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">state = later_state(客戶, i)，單號 T-201～T-206</text>
+<text x="68" y="1638" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">expected = DATA 裡人工標的組別</text>
+<rect x="176.0" y="1682" width="240" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="296" y="1707" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">第一則嗎？</text>
+<text x="296" y="1726" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">example_state 還沒設</text>
+<rect x="52" y="1764" width="404" height="94" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="68" y="1792" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">記下 example_state</text>
+<text x="68" y="1816" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">這次 ask_with_memory 會帶的 state（含記憶）</text>
+<text x="68" y="1840" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">給 ⑤ 寫進 playground.json</text>
+<rect x="52" y="1884" width="488" height="70" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="68" y="1912" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">response = ask_with_memory(state, ROUTE)</text>
+<text x="68" y="1936" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">帶記憶問；gate 也會判這則新訊息（官網的六則都沒存）</text>
+<rect x="52" y="1980" width="488" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="68" y="2008" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">兩個答案各跟 expected 比</text>
+<text x="68" y="2032" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">對 ✓、錯 ✗，累計分對幾則，印一列</text>
+<rect x="40" y="2122" width="512" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="2150" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">印 Expected routes</text>
+<text x="56" y="2174" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不帶記憶分對幾則 / 6、帶記憶幾則 / 6（官網 Jev：2/6、6/6）</text>
+<rect x="40" y="2218" width="512" height="94" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="2246" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">⑤ Open it in the playground</text>
+<text x="56" y="2270" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">官網產生 TypeSafe playground 連結；這裡改成把 example_state</text>
+<text x="56" y="2294" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">和 ROUTE 寫進 basic_memory_h2o/playground.json</text>
+<rect x="40" y="2338" width="512" height="118" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="56" y="2366" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">⑥ compare()：跟官網（Jev）對照（官網沒有這段）</text>
+<text x="56" y="2390" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">第一則不帶記憶的分派；五張舊單的組別、P(remember)、存了沒</text>
+<text x="56" y="2414" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">最後存下的記憶；六則新訊息 plain / with memory 並排</text>
+<text x="56" y="2438" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">兩邊各分對幾則</text>
+<rect x="196.0" y="2504" width="200" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="296" y="2531.5" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">結束</text>
+<rect x="620" y="262" width="592" height="70" rx="10" fill="#f3eaf8" stroke="#7b3fa0" stroke-width="1.8"/>
+<text x="636" y="290" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">saved = MEMORIES.get(客戶 ID, [])</text>
+<text x="636" y="314" fill="#7b3fa0" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">客戶 ID = state[&quot;customer&quot;][&quot;id&quot;]，所以 state 一定要有 customer.id</text>
+<rect x="670.0" y="358" width="260" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="385.5" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">這個客戶有記憶嗎？</text>
+<rect x="620" y="428" width="460" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="456" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">要送的 state 多一欄記憶</text>
+<text x="636" y="480" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">earlier_tickets_from_this_customer = saved</text>
+<rect x="620" y="524" width="592" height="70" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="636" y="552" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">第 1 問：ask(要送的 state, ROUTE) → response</text>
+<text x="636" y="576" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">Choice：7 個客服組各一個機率，choice = 機率最高的那組</text>
+<rect x="620" y="620" width="592" height="94" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="648" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">memory = as_memory(原 state, ROUTE, response)</text>
+<text x="636" y="672" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">request：原本的 state，不含舊記憶（記憶不會一層包一層）</text>
+<text x="636" y="696" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">jev_answered：{題目: 選中組別的說明}（照官網，沒有改名）</text>
+<rect x="620" y="740" width="592" height="118" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="636" y="768" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">第 2 問：remember_probability(memory) = ask(memory, GATE)</text>
+<text x="636" y="792" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">Noul：request.ticket 有沒有說出長期不變的事實（版本、方案、合約）</text>
+<text x="636" y="816" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">只算客戶或客服寫的；jev_answered 說的或暗示的都不算</text>
+<text x="636" y="840" fill="#c0392b" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">h2o 的 noul_floor：P 只會 ≤ 0.199 或 ≥ 0.801，存不存不受影響</text>
+<rect x="670.0" y="884" width="260" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="909" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">P(remember) ≥ 0.5 嗎？</text>
+<text x="800" y="928" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">REMEMBER_AT = 0.5</text>
+<rect x="620" y="966" width="460" height="70" rx="10" fill="#f3eaf8" stroke="#7b3fa0" stroke-width="1.8"/>
+<text x="636" y="994" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">MEMORIES[客戶 ID].append(memory)</text>
+<text x="636" y="1018" fill="#7b3fa0" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">之後這個客戶的每一次呼叫都會帶著它</text>
+<rect x="630.0" y="1062" width="340" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="1087" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">回傳第 1 問的 response</text>
+<text x="800" y="1106" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不管有沒有存；拿到的跟 ask() 一樣</text>
+<rect x="620" y="1262" width="592" height="118" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="1290" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">轉成 JSON 字串，交給 _system_one</text>
+<text x="636" y="1314" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">json.dumps(state)、q.model_dump(mode=&quot;json&quot;, exclude_none=True)</text>
+<text x="636" y="1338" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">_system_one(MODEL, state, 題目) 外面包 @json_cache</text>
+<text x="636" y="1362" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">key = 函式名稱|MODEL|state|題目，超過 200 字換成 sha256</text>
+<rect x="650.0" y="1406" width="300" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="1431" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">快取裡有這筆嗎？</text>
+<text x="800" y="1450" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">用上一格的 key 查 json_cache.json</text>
+<rect x="980" y="1387" width="232" height="94" rx="10" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.8"/>
+<text x="996" y="1415" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">直接回傳快取</text>
+<text x="996" y="1439" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">複製一份，轉成 H2OResponse</text>
+<text x="996" y="1463" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不問 h2o</text>
+<rect x="620" y="1496" width="592" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="1524" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">JSON 轉回 dict 和 Choice / Noul 物件</text>
+<text x="636" y="1548" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">json.loads(state)、TypeAdapter(Question).validate_python(...)</text>
+<rect x="620" y="1592" width="592" height="94" rx="10" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.8"/>
+<text x="636" y="1620" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">H2OClassifier.invoke → POST localhost:8741/v1/systemone</text>
+<text x="636" y="1644" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">body = {state, questions}；timeout 120 秒</text>
+<text x="636" y="1668" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">h2o 只有 fast 一檔，每題一次 forward pass</text>
+<rect x="680.0" y="1742" width="240" height="44" rx="22.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="1769.5" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">回應成功（2xx）？</text>
+<rect x="980" y="1717" width="232" height="94" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="996" y="1745" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">with_retry：能重試嗎？</text>
+<text x="996" y="1769" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">連線失敗 / 逾時 / 429 / 5xx</text>
+<text x="996" y="1793" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">而且還沒試滿 6 次</text>
+<rect x="980" y="1837" width="232" height="94" rx="10" fill="#f8dcd8" stroke="#c0392b" stroke-width="1.8"/>
+<text x="996" y="1865" fill="#c0392b" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">拋出例外，程式中止</text>
+<text x="996" y="1889" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">試滿 6 次，或 400 / 422 等</text>
+<text x="996" y="1913" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不重試的錯誤</text>
+<rect x="620" y="1812" width="340" height="142" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="1840" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">_parse（classifier_h2o.py）</text>
+<text x="636" y="1864" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">Choice：confidence 照文件公式重算</text>
+<text x="636" y="1888" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">Noul：補上 confidence = |2p − 1|</text>
+<text x="636" y="1912" fill="#c0392b" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">shim 的 noul_floor 已把 (0.199, 0.801)</text>
+<text x="636" y="1936" fill="#c0392b" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">之間的 Noul 推到 ≤ 0.199 或 ≥ 0.801</text>
+<rect x="620" y="1980" width="340" height="70" rx="10" fill="#ffffff" stroke="#b8bec9" stroke-width="1.4"/>
+<text x="636" y="2008" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">寫進快取</text>
+<text x="636" y="2032" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">整檔重寫 json_cache.json（先寫 .tmp 再改名）</text>
+<rect x="630.0" y="2076" width="340" height="56" rx="28.0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.4"/>
+<text x="800" y="2101" fill="#1f2430" font-size="14.5" font-weight="400" text-anchor="middle" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">回傳 H2OResponse</text>
+<text x="800" y="2120" fill="#5b6270" font-size="11.5" font-weight="400" text-anchor="middle" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace">answers[&quot;team&quot;] 或 answers[&quot;remember&quot;]</text>
+<rect x="604" y="2182" width="624" height="118" rx="10" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.8"/>
+<text x="620" y="2210" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">一次跑完問幾次 h2o？</text>
+<text x="620" y="2234" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">ask() 一共被呼叫 62 次：分派（ROUTE）32 次、gate（GATE）30 次</text>
+<text x="620" y="2258" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">同樣的 state + 題目只問一次 h2o，其他都讀快取（官網 Jev 是 32 筆）</text>
+<text x="620" y="2282" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">第二次跑全部讀快取；要重問就刪掉 basic_memory_h2o/json_cache.json</text>
+<rect x="604" y="2324" width="624" height="142" rx="10" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.8"/>
+<text x="620" y="2352" fill="#1f2430" font-size="15" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">會讀寫的檔案、會連的地方</text>
+<text x="620" y="2376" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">讀寫：basic_memory_h2o/json_cache.json（快取，不入版控）</text>
+<text x="620" y="2400" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">寫：basic_memory_h2o/playground.json</text>
+<text x="620" y="2424" fill="#7b3fa0" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">記憶：MEMORIES 只在記憶體裡，程式結束就沒了</text>
+<text x="620" y="2448" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">網路：只連 http://localhost:8741（h2o-lightning 的 shim）</text>
+<text x="24" y="50" fill="#1f2430" font-size="22" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">basic_memory_h2o.py 程式流程</text>
+<text x="24" y="78" fill="#5b6270" font-size="13.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">照官網 Simple memory system 範例：客服單分派加上記憶。每次 ask_with_memory() 問 h2o-lightning 兩題：分派（Choice）→ 值不值得記住（Noul）</text>
+<rect x="760" y="104" width="22" height="14" rx="3" fill="#e8eefb" stroke="#2c55c9" stroke-width="1.5"/>
+<text x="790" y="116" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">問 h2o-lightning（本機 :8741）</text>
+<rect x="1010" y="104" width="22" height="14" rx="3" fill="#f8dcd8" stroke="#c0392b" stroke-width="1.5"/>
+<text x="1040" y="116" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">拋出例外、程式中止</text>
+<polyline points="760,140 784,140" fill="none" stroke="#1d8656" stroke-width="1.7"/>
+<text x="790" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<polyline points="880,140 904,140" fill="none" stroke="#4a5160" stroke-width="1.7"/>
+<text x="910" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否 / 下一步</text>
+<polyline points="1000,140 1024,140" fill="none" stroke="#c0392b" stroke-width="1.7"/>
+<text x="1030" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">錯誤</text>
+<polyline points="1120,140 1144,140" fill="none" stroke="#2c55c9" stroke-width="1.7" stroke-dasharray="6 4"/>
+<text x="1150" y="144" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">呼叫函式</text>
+<rect x="760" y="160" width="22" height="14" rx="3" fill="none" stroke="#9aa1ad" stroke-dasharray="4 3"/>
+<text x="790" y="172" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">函式範圍</text>
+<rect x="880" y="160" width="22" height="14" rx="3" fill="#f4f5f7" stroke="#b8bec9" stroke-width="1.5"/>
+<text x="910" y="172" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不在主流程上的分支</text>
+<rect x="1060" y="160" width="22" height="14" rx="3" fill="#f3eaf8" stroke="#7b3fa0" stroke-width="1.5"/>
+<text x="1090" y="172" fill="#1f2430" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">讀寫記憶 MEMORIES</text>
+<text x="304" y="1050" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="48" y="996" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">下一張</text>
+<text x="48" y="818" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">③ Send the earlier tickets and watch the answers change</text>
+<text x="48" y="838" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">舊單照收到的順序一張一張送進 ask_with_memory()，每張之後看新訊息的分派怎麼變</text>
+<text x="464" y="996" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<text x="304" y="1554" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="304" y="1756" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="424" y="1702" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<text x="48" y="1500" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">下一則</text>
+<text x="48" y="1442" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">④ Route the same messages for both customers</text>
+<text x="48" y="1462" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">6 則新訊息，各問一次不帶記憶（plain）、一次帶記憶（with memory）</text>
+<text x="454" y="1500" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<text x="36" y="538" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">main()：照官網筆記本的順序跑一遍</text>
+<text x="36" y="558" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">每一段的 print 照官網，只是 Jev 換成 h2o</text>
+<text x="808" y="420" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="938" y="372" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否：原 state 照送</text>
+<text x="808" y="958" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="938" y="904" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否：不存</text>
+<text x="616" y="222" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">ask_with_memory(state, questions)</text>
+<text x="616" y="242" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">③ ④ 呼叫；參數、回傳值都跟 ask() 一樣，可以直接取代 ask()</text>
+<text x="958" y="1426" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="808" y="1482" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<text x="928" y="1756" fill="#c0392b" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">否</text>
+<text x="1092" y="1709" fill="#5b6270" font-size="12.5" font-weight="400" text-anchor="end" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">能：等 1～20 秒再送</text>
+<text x="1108" y="1828" fill="#c0392b" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">不能</text>
+<text x="808" y="1804" fill="#1d8656" font-size="12.5" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">是</text>
+<text x="616" y="1204" fill="#1f2430" font-size="14.5" font-weight="700" text-anchor="start" font-family="Consolas,Menlo,'DejaVu Sans Mono','WenQuanYi Zen Hei Mono',monospace" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">ask(state, questions)</text>
+<text x="616" y="1224" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">官網的 client.system_one：模型固定、每次都經過快取</text>
+<text x="616" y="1242" fill="#5b6270" font-size="12" font-weight="400" text-anchor="start" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">呼叫的地方：② ask(slow)、③ remember_probability、④ plain、上面的第 1、2 問</text>
+<text x="1224" y="1166" fill="#2c55c9" font-size="12.5" font-weight="400" text-anchor="end" font-family="'Microsoft JhengHei','PingFang TC','Noto Sans TC','Heiti TC','WenQuanYi Zen Hei',sans-serif">兩問都呼叫 ask()</text>
+</svg>
