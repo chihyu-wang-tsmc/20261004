@@ -42,6 +42,11 @@ State、Instructions、Criteria、Structured data、Patterns 官網只有 JSON �
   * 尺寸：官網 280 ~ 1568 px 以外整個 request 拒絕（400 / 413）；h2o 照收，太大的縮到 1,048,576 px 以內
     （image.max_pixels），太小的也收。所以 Limits 那段照官網的表在送出前自己檢查。
   * 狀態碼：h2o 跟官網不一樣的地方（超過張數是 422、超過 16 MiB 是 400 不是 413 等），Errors 那段逐條對照。
+  * EXIF 轉向：官網說 API 不套用 EXIF 的 orientation；h2o 的 vLLM 讀圖時會套（vllm/multimodal/image.py 的
+    ImageOps.exif_transpose），所以帶 EXIF 的手機照片在 h2o 上本來就是正的。Preparing images 那段三張對照。
+  * 答案後面的 ✓ / ✗ 是跟人看圖給的標準答案比（官網沒有），跑完印總共對幾題。官網 Criteria 的拼圖 Noul
+    （true 用範例圖定義）在 h2o 上會把拼好的判成 no：照片只要跟範例圖有一點不同就判錯。旁邊加一題
+    「跟這張圖的排列一樣嗎」，這個問法判得對。
   * Noul 判斷一律看 >= 0.5（官網沒給門檻）。classifier_h2o.py 開頭說的 noul_floor 會把 Noul 推到 0.199 以下
     或 0.801 以上，所以這裡只看哪一邊贏，不拿 Noul 的機率去比別的門檻。
   * Box（Find where it is）預設是關的：box 題回 400 時印出怎麼開（同 box_h2o.py 檔頭），然後繼續往下跑。
@@ -260,9 +265,34 @@ def brief(answer: dict) -> str:
     return f"score {answer['score']:.2f}  (confidence {answer['confidence']:.2f};  {probs})"
 
 
-def show_answers(response: dict, indent: str = "  ") -> None:
+CHECKED = {"ok": 0, "wrong": 0}  # 有標準答案的題目，main() 最後印總數
+
+
+def mark(answer: dict, expected) -> str:
+    """跟標準答案比：Noul 看 >= YES，Choice 看選項。expected 是人看圖給的答案。"""
+    got = answer["noul"] >= YES if answer["type"] == "noul" else answer.get("choice")
+    ok = got == expected
+    CHECKED["ok" if ok else "wrong"] += 1
+    if ok:
+        return "✓"
+    return f"✗ expected {({True: 'yes', False: 'no'}).get(expected, expected)}"
+
+
+def show_answers(
+    response: dict, indent: str = "  ", expected: dict | None = None
+) -> None:
+    """每題印一行；expected（題目名稱 -> 標準答案）有給的題目後面加 ✓ / ✗。"""
     for name, answer in response["answers"].items():
-        print(f"{indent}{name:<16} {brief(answer)}")
+        line = f"{indent}{name:<16} {brief(answer)}"
+        if expected and name in expected:
+            line += f"  {mark(answer, expected[name])}"
+        print(line)
+
+
+def show_marks(response: dict, expected: dict, indent: str = "  ") -> None:
+    """官網原樣印出答案之後，另外每題印一行 ✓ / ✗。"""
+    for name, want in expected.items():
+        print(f"{indent}{name:<16} {mark(response['answers'][name], want)}")
 
 
 def h2o_images() -> dict:
@@ -324,6 +354,7 @@ def sending_images() -> None:
     print("\nanswers (found-dog.jpg in `photo`, the same husky as the poster):")
     print(json.dumps(without_none(response["answers"]), indent=2))
     print(f"usage.images {response['usage'].get('images')}")
+    show_marks(response, {"same_dog": True, "has_collar": True})
 
     # 同一張海報，`photo` 換成另一隻狗：same_dog 和 coat 應該跟著變
     response = ask(
@@ -333,13 +364,22 @@ def sending_images() -> None:
         }
     )
     print("\nthe same poster, other-dog.jpg (a dachshund) in `photo`:")
-    show_answers(response)
+    show_answers(
+        response, expected={"same_dog": False, "has_collar": True, "coat": "short"}
+    )
 
     print("\n### Asset fields\n### References\n")
     print("the rules in these two sections are sent one by one under Errors below")
 
 
 # ---- ## Uploading images ----
+
+# 三張門口照片的標準答案（person_present、carrying）
+DOORS = {
+    "door-camera.jpg": {"person_present": True, "carrying": "package"},
+    "door-bags.jpg": {"person_present": True, "carrying": "bag"},
+    "door-empty.jpg": {"person_present": False, "carrying": "nothing"},
+}
 
 
 def uploading_images() -> None:
@@ -360,6 +400,7 @@ def uploading_images() -> None:
         {"state": {"door": Image(DATA_DIR / "door-camera.jpg")}, "questions": questions}
     )
     print(result.answers)
+    show_marks(result.model_dump(mode="json"), DOORS["door-camera.jpg"])
 
     # 官網沒有：另外兩張門口的照片（提著購物袋、門口沒人）
     for name in ("door-bags.jpg", "door-empty.jpg"):
@@ -367,7 +408,7 @@ def uploading_images() -> None:
             {"state": {"door": Image(DATA_DIR / name)}, "questions": questions}
         )
         print(f"\n{name}")
-        show_answers(result.model_dump(mode="json"))
+        show_answers(result.model_dump(mode="json"), expected=DOORS[name])
 
     # 官網：To put an image inside a sentence ... see the SDK guides。str(image) 就是參照字串，可以寫進 f-string
     door, badge = Image(DATA_DIR / "train-door.jpg"), Image(DATA_DIR / "badge.jpg")
@@ -390,7 +431,7 @@ def uploading_images() -> None:
         )
     )
     print(f"assets: {list(payload['assets'])}")
-    show_answers(ask(request))
+    show_answers(ask(request), expected={"is_badge_holder": True})
     print("(the JavaScript example is the same request; this file is Python only)")
 
 
@@ -422,7 +463,7 @@ def over_http() -> None:
     response = classifier.client.post(SYSTEMONE, files=files)
     parsed = classifier._parse(response, request).model_dump(mode="json")
     print('h2o\'s own multipart (no assets, "door": "[image 1]"):')
-    show_answers(parsed)
+    show_answers(parsed, expected={"person_present": True})
 
     print("\n#### Base64 in JSON\n")
     # 官網的程式：image_asset() 逐字照抄（box_h2o.py），requests.post 換成 client
@@ -445,6 +486,7 @@ def over_http() -> None:
         }
     )
     print(response["answers"])
+    show_marks(response, DOORS["door-camera.jpg"])
 
 
 # ---- ## Image placement ----
@@ -469,20 +511,22 @@ def placement_state() -> None:
         ),
         "open_now": Noul(instructions="Is the door in `frames[2].frame` open?"),
     }
-    for label, names in (
+    for label, names, opened in (
         (
             "the door opens",
             ["door-frame-1.jpg", "door-frame-2.jpg", "door-frame-3.jpg"],
+            True,
         ),
         (
             "the door stays shut",
             ["door-still-1.jpg", "door-still-2.jpg", "door-still-3.jpg"],
+            False,
         ),
     ):
         assets = {ref: asset(name) for ref, name in zip(refs, names, strict=True)}
         response = ask({"state": state, "assets": assets, "questions": questions})
         print(f"\n{label} ({', '.join(names)})")
-        show_answers(response)
+        show_answers(response, expected={"door_opened": opened, "open_now": opened})
 
 
 def placement_instructions() -> None:
@@ -492,9 +536,9 @@ def placement_instructions() -> None:
         instructions="Is the person in `door` the same person as in this badge photo: 9a21c7d3-badge?"
     )
     print(json.dumps({"instructions": question.instructions}))
-    for badge, label in (
-        ("badge.jpg", "the same man, from another photo"),
-        ("badge-other.jpg", "a different man"),
+    for badge, label, same in (
+        ("badge.jpg", "the same man, from another photo", True),
+        ("badge-other.jpg", "a different man", False),
     ):
         response = ask(
             {
@@ -506,13 +550,9 @@ def placement_instructions() -> None:
                 "questions": {"is_badge_holder": question},
             }
         )
-        verdict = (
-            "badge holder"
-            if response["answers"]["is_badge_holder"]["noul"] >= YES
-            else "not the badge holder"
-        )
+        answer = response["answers"]["is_badge_holder"]
         print(
-            f"  train-door.jpg + {badge:<16} ({label}): {brief(response['answers']['is_badge_holder'])} -> {verdict}"
+            f"  train-door.jpg + {badge:<16} ({label}): {brief(answer)}  {mark(answer, same)}"
         )
     print(
         "several questions about one image: put it in the state once (token counts under Image tokens)"
@@ -543,12 +583,12 @@ def placement_criteria(max_images: int) -> None:
         "c83a0e15-palm2": asset("palm2.jpg"),
         "a7e94d02-fist": asset("fist.jpg"),
     }
-    cameras = (
-        "camera-thumbs-up.jpg",
-        "camera-palms.jpg",
-        "camera-flex.jpg",
-        "camera-ok.jpg",
-    )
+    cameras = {  # 照片 -> 標準答案
+        "camera-thumbs-up.jpg": "thumbs_up",
+        "camera-palms.jpg": "open_palm",
+        "camera-flex.jpg": "fist",
+        "camera-ok.jpg": "none",
+    }
     question = gesture(["4fd2e7b9-palm1", "c83a0e15-palm2"])
     print(json.dumps(question.model_dump(mode="json"), indent=2))
     print(
@@ -557,7 +597,7 @@ def placement_criteria(max_images: int) -> None:
     response = try_ask(
         {
             "state": {"camera": "e48a6f30-cam"},
-            "assets": {"e48a6f30-cam": asset(cameras[0]), **examples},
+            "assets": {"e48a6f30-cam": asset(next(iter(cameras))), **examples},
             "questions": {"gesture": question},
         }
     )
@@ -569,9 +609,10 @@ def placement_criteria(max_images: int) -> None:
         question = gesture(["4fd2e7b9-palm1"])
         examples.pop("c83a0e15-palm2")
     else:
-        print(f"  {cameras[0]:<22} {brief(response['answers']['gesture'])}")
-        cameras = cameras[1:]
-    for name in cameras:
+        first = next(iter(cameras))
+        answer = response["answers"]["gesture"]
+        print(f"  {first:<22} {brief(answer)}  {mark(answer, cameras.pop(first))}")
+    for name, want in cameras.items():
         response = ask(
             {
                 "state": {"camera": "e48a6f30-cam"},
@@ -579,7 +620,8 @@ def placement_criteria(max_images: int) -> None:
                 "questions": {"gesture": question},
             }
         )
-        print(f"  {name:<22} {brief(response['answers']['gesture'])}")
+        answer = response["answers"]["gesture"]
+        print(f"  {name:<22} {brief(answer)}  {mark(answer, want)}")
 
     # 官網：Score levels can each include an example picture（握拳、半張開、張開三級）
     print("\nScore levels as pictures: how open is the hand?")
@@ -616,16 +658,26 @@ def placement_criteria(max_images: int) -> None:
             false="Parts missing or in the wrong place.",
         ),
     )
-    for name in ("puzzle-done.jpg", "puzzle-broken.jpg"):
+    # 官網沒有：同一件事改問「跟這張拼好的圖排列一樣嗎」。h2o 上官網的問法只要照片跟範例圖有一點不同
+    # （換底色、轉一點角度）就判 no，這個問法拼好、拼錯都判得對，兩種一起印出來對照
+    same = Noul(
+        instructions=f"Does the puzzle in `photo` show the same arrangement as this assembled puzzle: {reference}?"
+    )
+    for name, done in (("puzzle-done.jpg", True), ("puzzle-broken.jpg", False)):
         ref = str(uuid.uuid4())
         response = ask(
             {
                 "state": {"photo": ref},
                 "assets": {ref: asset(name), reference: asset("puzzle-assembled.jpg")},
-                "questions": {"assembled": assembled},
+                "questions": {"assembled": assembled, "same_as_picture": same},
             }
         )
-        print(f"  {name:<22} {brief(response['answers']['assembled'])}")
+        print(f"  {name}")
+        show_answers(
+            response,
+            indent="    ",
+            expected={"assembled": done, "same_as_picture": done},
+        )
 
 
 def structured_data() -> None:
@@ -660,7 +712,7 @@ def structured_data() -> None:
     print(
         "lineup: other-dog.jpg, husky-path.jpg (the poster's husky), frenchie.jpg (in a hoodie)"
     )
-    show_answers(response)
+    show_answers(response, expected={"match": "second", "dressed": True})
 
     # 官網：... or to one in a labeled object as `faces.happy`
     happy, serious = str(uuid.uuid4()), str(uuid.uuid4())
@@ -679,7 +731,7 @@ def structured_data() -> None:
         }
     )
     print("\nfaces: happy = laughing.jpg, serious = badge-other.jpg")
-    show_answers(response)
+    show_answers(response, expected={"laughing": True, "tie": True})
 
     # 官網：A criterion can hold several example pictures as an array
     palm1, palm2 = str(uuid.uuid4()), str(uuid.uuid4())
@@ -691,7 +743,7 @@ def structured_data() -> None:
         ),
     )
     print("\na criterion with two example pictures (palm1.jpg, palm2.jpg):")
-    for name in ("camera-palms.jpg", "camera-thumbs-up.jpg"):
+    for name, want in (("camera-palms.jpg", True), ("camera-thumbs-up.jpg", False)):
         cam = str(uuid.uuid4())
         response = ask(
             {
@@ -704,7 +756,8 @@ def structured_data() -> None:
                 "questions": {"palm": palm},
             }
         )
-        print(f"  {name:<22} {brief(response['answers']['palm'])}")
+        answer = response["answers"]["palm"]
+        print(f"  {name:<22} {brief(answer)}  {mark(answer, want)}")
 
 
 # ---- ## Patterns ----
@@ -756,6 +809,7 @@ def look_closer() -> None:
         answer = response["answers"]["house_number"]
         print(
             f"  {label:<24} {answer['choice']}  confidence {answer['confidence']:.2f}"
+            f"  {mark(answer, '2')}"
         )
         if answer["confidence"] >= LOOK_CLOSER:
             print(f"  confidence >= {LOOK_CLOSER}: done")
@@ -787,10 +841,11 @@ def tiles_of(region: dict, tile: float = 0.6) -> dict[str, dict]:
     return out
 
 
-def search_large_image(max_depth: int = 3) -> dict:
+def search_large_image(max_depth: int = 6) -> dict:
     print("\n### Search a large image\n")
     # 官網：Cut the image into tiles and ask a Choice with the tiles as its options.
     # Repeat on the chosen tile until the target takes up most of the tile.
+    # 每一層 tile 是上一層的 0.6 倍，門鈴只有圖寬的 5% 左右，大概第 5 層才佔得滿 tile
     image = PILImage.open(DATA_DIR / "door-empty.jpg")
     region = {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 1.0}
     for depth in range(1, max_depth + 1):
@@ -1088,12 +1143,20 @@ def preparing_images() -> None:
                 f"  {'':<16} {'scaled up (box_h2o.ready)':<44} -> {describe(out):<20} {'; '.join(check_image(out.read_bytes())) or 'ok'}"
             )
 
-    # 官網：The API ... does not apply the EXIF orientation。轉正前、轉正後各問一次
-    print("\nthe phone photo before and after rotating the pixels upright:")
+    # 官網：The API ... does not apply the EXIF orientation。h2o 不一樣：vLLM 讀圖時會套
+    # ImageOps.exif_transpose（vllm/multimodal/image.py），所以帶 EXIF 的 phone.jpg 進模型時已經是正的。
+    # 另外存一張同樣像素、拿掉 EXIF 的，才是 Jev 看到的樣子
+    with PILImage.open(folder / "phone.jpg") as image:
+        image.convert("RGB").save(folder / "phone-no-exif.jpg", "JPEG", quality=90)
+    print("\nthe phone photo: is the person upright?")
     upright = Noul(
         instructions="Is the person in `photo` upright, with the head at the top of the picture?"
     )
-    for name in ("phone.jpg", "phone-ready.jpg"):
+    for name, want, note in (
+        ("phone.jpg", True, "pixels sideways, EXIF says rotate: vLLM rotates it"),
+        ("phone-no-exif.jpg", False, "the same pixels without EXIF: what Jev sees"),
+        ("phone-ready.jpg", True, "after the docs' Pillow code"),
+    ):
         ref, photo = image_asset(str(folder / name))
         response = ask(
             {
@@ -1102,7 +1165,8 @@ def preparing_images() -> None:
                 "questions": {"upright": upright},
             }
         )
-        print(f"  {name:<16} {brief(response['answers']['upright'])}")
+        answer = response["answers"]["upright"]
+        print(f"  {name:<18} {brief(answer)}  {mark(answer, want)}  ({note})")
     print(
         "  (phone.jpg is 3024 x 4032: Jev rejects it with 413, h2o scales it down and reads it)"
     )
@@ -1409,6 +1473,11 @@ def main() -> None:
     preparing_images()
     image_tokens()
     errors()
+    total = CHECKED["ok"] + CHECKED["wrong"]
+    print(
+        f"\n{CHECKED['ok']} / {total} answers match the expected answer"
+        f" ({CHECKED['wrong']} marked ✗ above)"
+    )
 
 
 if __name__ == "__main__":
