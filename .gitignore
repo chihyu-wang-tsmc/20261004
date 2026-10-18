@@ -71,3 +71,6 @@ sde_cascade/extract_cache.*
 # box_*.py 切出來的圖、畫了框的圖、request.json，每次跑都會重生（box/ 的三張照片和 SOURCES.md 要留）
 box_jevk5/
 box_h2o/
+
+# images_h2o.py 切出來的圖、Preparing images 的輸入和輸出、畫了框的圖，每次跑都會重生（images/ 的照片、合成圖和 SOURCES.md 要留）
+images_h2o/
