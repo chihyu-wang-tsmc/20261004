@@ -1,0 +1,300 @@
+{
+ "documents": {
+  "Patent abstract: a freestanding structural wooden perch for poultry or pet birds. The elevated roost has crossbars sized for bird feet and mounts inside an aviary.": "專利摘要：一種獨立式、結構用的木製棲架，供家禽或寵物鳥使用。架高的棲木設有符合鳥爪大小的橫桿，可安裝在鳥舍內。"
+ },
+ "titles": {
+  "A HUMAN NECESSITIES": "A 人類生活必需",
+  "B PERFORMING OPERATIONS TRANSPORTING": "B 作業；運輸",
+  "C CHEMISTRY METALLURGY": "C 化學；冶金",
+  "D TEXTILES PAPER": "D 紡織；造紙",
+  "E FIXED CONSTRUCTIONS": "E 固定建築物",
+  "F MECHANICAL ENGINEERING LIGHTING HEATING WEAPONS BLASTING": {
+   "short": "F 機械工程；照明；加熱；武器",
+   "full": "F 機械工程；照明；加熱；武器；爆破"
+  },
+  "G PHYSICS": "G 物理",
+  "H ELECTRICITY": "H 電學",
+  "Y GENERAL TAGGING OF NEW TECHNOLOGICAL DEVELOPMENTS GENERAL TAGGING OF CROSS-SECTIONAL TECHNOLOGIES SPANNING OVER SEVERAL SECTIONS OF THE IPC TECHNICAL SUBJECTS COVERED BY FORMER USPC CROSS-REFERENCE ART COLLECTIONS [XRACs] AND DIGESTS": {
+   "short": "Y 新技術發展的一般標記",
+   "full": "Y 新技術發展的一般標記；橫跨 IPC 多個部的跨領域技術的一般標記；前 USPC 交叉參考技術集（XRACs）及摘要涵蓋的技術主題"
+  },
+  "A01 AGRICULTURE FORESTRY ANIMAL HUSBANDRY HUNTING TRAPPING FISHING": {
+   "short": "A01 農業；林業；畜牧業；狩獵；捕魚",
+   "full": "A01 農業；林業；畜牧業；狩獵；誘捕；捕魚"
+  },
+  "A21 BAKING EDIBLE DOUGHS": "A21 焙烤；可食麵團",
+  "A41 WEARING APPAREL": "A41 服裝",
+  "A61 MEDICAL OR VETERINARY SCIENCE HYGIENE": "A61 醫學或獸醫學；衛生學",
+  "A99 SUBJECT MATTER NOT OTHERWISE PROVIDED FOR IN THIS SECTION": "A99 本部中未包括的主題",
+  "A01B SOIL WORKING IN AGRICULTURE OR FORESTRY PARTS, DETAILS, OR ACCESSORIES OF AGRICULTURAL MACHINES OR IMPLEMENTS, IN GENERAL making or covering furrows or holes for sowing, planting or manuring A01C5/00 ; mowers convertible to soil working apparatus or capable of soil working A01D42/04 ; mowers combined with soil working implements A01D43/12 ; soil working for engineering purposes E01 , E02 , E21": {
+   "short": "A01B 農林業的整地",
+   "full": "A01B 農業或林業的整地；一般農業機械或農具的部件、零件或附件（為播種、種植或施肥開溝或開穴見 A01C5/00；可改裝成整地機或能整地的割草機見 A01D42/04；與整地農具組合的割草機見 A01D43/12；工程用的整地見 E01、E02、E21）"
+  },
+  "A01C PLANTING SOWING FERTILISING parts, details or accessories of agricultural machines or implements, in general A01B51/00 - A01B75/00": {
+   "short": "A01C 種植；播種；施肥",
+   "full": "A01C 種植；播種；施肥（一般農業機械或農具的部件、零件或附件見 A01B51/00 至 A01B75/00）"
+  },
+  "A01D HARVESTING MOWING": "A01D 收穫；割草",
+  "A01F PROCESSING OF HARVESTED PRODUCE HAY OR STRAW PRESSES DEVICES FOR STORING AGRICULTURAL OR HORTICULTURAL PRODUCE devices for topping or skinning onions or flower bulbs A23N15/08": {
+   "short": "A01F 收穫物加工；農產品貯藏",
+   "full": "A01F 收穫產品的加工；乾草或稻草壓捆機；農產品或園藝產品的貯藏裝置（洋蔥或花卉球莖的去頂或去皮裝置見 A23N15/08）"
+  },
+  "A01G HORTICULTURE CULTIVATION OF VEGETABLES, FLOWERS, RICE, FRUIT, VINES, HOPS OR SEAWEED FORESTRY WATERING picking of fruits, vegetables, hops or the like A01D46/00 ; propagating unicellular algae C12N1/12": {
+   "short": "A01G 園藝；栽培；林業；澆水",
+   "full": "A01G 園藝；蔬菜、花卉、稻、果樹、葡萄、啤酒花或海藻的栽培；林業；澆水（水果、蔬菜、啤酒花等的採摘見 A01D46/00；單細胞藻類的繁殖見 C12N1/12）"
+  },
+  "A01H NEW PLANTS OR NON-TRANSGENIC PROCESSES FOR OBTAINING THEM PLANT REPRODUCTION BY TISSUE CULTURE TECHNIQUES": {
+   "short": "A01H 新植物；組織培養繁殖",
+   "full": "A01H 新植物或獲得新植物的非基因轉殖方法；以組織培養技術繁殖植物"
+  },
+  "A01J MANUFACTURE OF DAIRY PRODUCTS": "A01J 乳製品的製造",
+  "A01K ANIMAL HUSBANDRY AVICULTURE APICULTURE PISCICULTURE FISHING REARING OR BREEDING ANIMALS, NOT OTHERWISE PROVIDED FOR NEW BREEDS OF ANIMALS": {
+   "short": "A01K 畜牧業；養禽；養蜂；養魚",
+   "full": "A01K 畜牧業；養禽業；養蜂業；養魚業；捕魚；其他類未包括的動物飼養或繁殖；動物新品種"
+  },
+  "A01L SHOEING OF ANIMALS": "A01L 動物釘蹄鐵",
+  "A01M CATCHING, TRAPPING OR SCARING OF ANIMALS appliances for catching swarms or drone-catching A01K57/00 ; fishing A01K69/00 - A01K99/00 ; biocides, pest repellants or attractants A01N APPARATUS FOR THE DESTRUCTION OF NOXIOUS ANIMALS OR NOXIOUS PLANTS": {
+   "short": "A01M 捕捉或驅趕動物；除害裝置",
+   "full": "A01M 動物的捕捉、誘捕或驅趕（捕捉蜂群或雄蜂的器具見 A01K57/00；捕魚見 A01K69/00 至 A01K99/00；殺生劑、害蟲驅避劑或引誘劑見 A01N）；消滅有害動物或有害植物的裝置"
+  },
+  "A01N PRESERVATION OF BODIES OF HUMANS OR ANIMALS OR PLANTS OR PARTS THEREOF preservation of food or foodstuff A23 BIOCIDES, e.g. AS DISINFECTANTS, AS PESTICIDES OR AS HERBICIDES preparations for medical, dental or toiletry purposes which kill or prevent the growth or proliferation of unwanted organisms A61K PEST REPELLANTS OR ATTRACTANTS PLANT GROWTH REGULATORS": {
+   "short": "A01N 人體動植物的保存；殺生劑",
+   "full": "A01N 人體、動物、植物或其部分的保存（食品保存見 A23）；殺生劑，例如消毒劑、農藥或除草劑（殺死或抑制有害生物生長或增殖的醫療、牙科或盥洗用製劑見 A61K）；害蟲驅避劑或引誘劑；植物生長調節劑"
+  },
+  "A01P BIOCIDAL, PEST REPELLANT, PEST ATTRACTANT OR PLANT GROWTH REGULATORY ACTIVITY OF CHEMICAL COMPOUNDS OR PREPARATIONS": {
+   "short": "A01P 化合物的殺生或調節活性",
+   "full": "A01P 化合物或製劑的殺生、驅蟲、誘蟲或植物生長調節活性"
+  },
+  "A01K1/00 Housing animals Equipment therefor": {
+   "short": "A01K1/00 動物畜舍及其設備",
+   "full": "A01K1/00 動物畜舍；其設備"
+  },
+  "A01K31/00 Housing birds": "A01K31/00 禽舍",
+  "A01K47/00 Beehives": "A01K47/00 蜂箱",
+  "A01K61/00 Culture of aquatic animals receptacles for live fish, e.g. aquaria, A01K63/00": {
+   "short": "A01K61/00 水生動物的養殖",
+   "full": "A01K61/00 水生動物的養殖（活魚容器，例如水族箱，見 A01K63/00）"
+  },
+  "A01K69/00 Stationary catching devices": "A01K69/00 固定式捕撈裝置",
+  "A01K83/00 Fish-hooks": "A01K83/00 魚鉤",
+  "A01K2207/00 Modified animals": "A01K2207/00 經改造的動物",
+  "A01K31/002 Poultry cages, e.g. transport boxes Harvesting or transport of poultry A01K45/005": {
+   "short": "A01K31/002 家禽籠，例如運輸箱",
+   "full": "A01K31/002 家禽籠，例如運輸箱（家禽的收集或運輸見 A01K45/005）"
+  },
+  "A01K31/02 Door appliances Automatic door-openers": "A01K31/02 門的器具；自動開門器",
+  "A01K31/04 Dropping-boards Devices for removing excrement": {
+   "short": "A01K31/04 糞板；清糞裝置",
+   "full": "A01K31/04 糞板；清除糞便的裝置"
+  },
+  "A01K31/06 Cages , e.g. for singing birds for poultry A01K31/002": {
+   "short": "A01K31/06 鳥籠，例如鳴禽籠",
+   "full": "A01K31/06 籠子，例如鳴禽用（家禽用見 A01K31/002）"
+  },
+  "A01K31/10 Doors Trap-doors": "A01K31/10 門；活板門",
+  "A01K31/12 Perches for poultry or birds, e.g. roosts": {
+   "short": "A01K31/12 家禽或鳥類的棲架",
+   "full": "A01K31/12 家禽或鳥類的棲架，例如棲木"
+  },
+  "A01K31/14 Nest-boxes , e.g. for singing birds or the like": {
+   "short": "A01K31/14 巢箱，例如鳴禽用",
+   "full": "A01K31/14 巢箱，例如鳴禽或類似鳥類用"
+  },
+  "A01K31/18 Chicken coops or houses for baby chicks Brooders including auxiliary features, e.g. feeding, watering, demanuring, heating, ventilation battery breeding cages A01K31/005": {
+   "short": "A01K31/18 雛雞舍；育雛器",
+   "full": "A01K31/18 雛雞的雞舍；育雛器，包括附屬設施，例如餵食、給水、清糞、加熱、通風（層架式育雛籠見 A01K31/005）"
+  },
+  "A01K31/22 Poultry runs ; Poultry houses, including auxiliary features, e.g. feeding, watering, demanuring air-conditioning, e.g. ventilation, of animal housings A01K1/0047": {
+   "short": "A01K31/22 家禽運動場；家禽舍",
+   "full": "A01K31/22 家禽運動場；家禽舍，包括附屬設施，例如餵食、給水、清糞（畜舍的空調，例如通風，見 A01K1/0047）"
+  },
+  "A01K31/24 Dovecots Pigeon lofts": {
+   "short": "A01K31/24 鴿舍",
+   "full": "A01K31/24 鴿舍；鴿樓"
+  },
+  "A01K33/00 Nest-eggs": "A01K33/00 引窩用假蛋",
+  "A01K35/00 Marking poultry or other birds marking meat A22C17/10": {
+   "short": "A01K35/00 家禽或鳥類的標記",
+   "full": "A01K35/00 家禽或其他鳥類的標記（肉品的標記見 A22C17/10）"
+  },
+  "A01K37/00 Constraining birds, e.g. wing clamps": {
+   "short": "A01K37/00 約束鳥類的裝置",
+   "full": "A01K37/00 約束鳥類的裝置，例如翅膀夾"
+  },
+  "A01K39/00 Feeding or drinking appliances for poultry or other birds": {
+   "short": "A01K39/00 家禽的餵食或飲水器",
+   "full": "A01K39/00 家禽或其他鳥類的餵食或飲水器具"
+  },
+  "A01K41/00 Incubators for poultry": "A01K41/00 家禽孵化器",
+  "A01K43/00 Testing, sorting or cleaning eggs investigating or analysing eggs, e.g. by candling G01N33/08 ; Conveying devices for batteries A01K31/165 ; Pick-up devices": {
+   "short": "A01K43/00 蛋的檢驗、分級或清潔",
+   "full": "A01K43/00 蛋的檢驗、分級或清潔（蛋的檢查或分析，例如照蛋，見 G01N33/08；層架的輸送裝置見 A01K31/165）；拾取裝置"
+  },
+  "A01K45/00 Other aviculture appliances, e.g. devices for determining whether a bird is about to lay": {
+   "short": "A01K45/00 其他養禽器具",
+   "full": "A01K45/00 其他養禽器具，例如判斷鳥是否即將產蛋的裝置"
+  },
+  "E01 CONSTRUCTION OF ROADS, RAILWAYS, OR BRIDGES": "E01 道路、鐵路或橋梁的建造",
+  "E21 EARTH OR ROCK DRILLING MINING": {
+   "short": "E21 土層或岩石鑽進；採礦",
+   "full": "E21 土層或岩石的鑽進；採礦"
+  },
+  "E99 SUBJECT MATTER NOT OTHERWISE PROVIDED FOR IN THIS SECTION": "E99 本部中未包括的主題",
+  "E99Z SUBJECT MATTER NOT OTHERWISE PROVIDED FOR IN THIS SECTION": "E99Z 本部中未包括的主題",
+  "E99Z99/00 Subject matter not otherwise provided for in this section": "E99Z99/00 本部中未包括的主題",
+  "Y02 TECHNOLOGIES OR APPLICATIONS FOR MITIGATION OR ADAPTATION AGAINST CLIMATE CHANGE": {
+   "short": "Y02 減緩或適應氣候變遷的技術",
+   "full": "Y02 減緩或適應氣候變遷的技術或應用"
+  },
+  "E01B PERMANENT WAY PERMANENT-WAY TOOLS MACHINES FOR MAKING RAILWAYS OF ALL KINDS derailing or rerailing blocks on track, track brakes or retarders B61K": {
+   "short": "E01B 鐵路軌道及鋪設機械",
+   "full": "E01B 永久軌道；永久軌道用工具；各種鐵路的鋪設機械（軌道上的脫軌器或復軌器、軌道制動器或減速器見 B61K）"
+  },
+  "E01C CONSTRUCTION OF, OR SURFACES FOR, ROADS, SPORTS GROUNDS, OR THE LIKE MACHINES OR AUXILIARY TOOLS FOR CONSTRUCTION OR REPAIR forming roads or like surfaces by compacting or grading snow or ice E01H": {
+   "short": "E01C 道路、運動場的建造或路面",
+   "full": "E01C 道路、運動場或類似場地的建造或其路面；建造或修理用的機械或輔助工具（以壓實或整平冰雪形成道路或類似路面見 E01H）"
+  },
+  "E01D CONSTRUCTION OF BRIDGES, ELEVATED ROADWAYS OR VIADUCTS ASSEMBLY OF BRIDGES bridges extending between terminal buildings and aircraft for embarking or disembarking passengers B64F1/305 ; tracks for special kinds of railways E01B25/00 ; culverts E01F5/005": {
+   "short": "E01D 橋梁、高架道路的建造",
+   "full": "E01D 橋梁、高架道路或高架橋的建造；橋梁的組裝（航廈與飛機之間供旅客上下機的橋見 B64F1/305；特殊鐵路的軌道見 E01B25/00；涵洞見 E01F5/005）"
+  },
+  "E01F ADDITIONAL WORK, SUCH AS EQUIPPING ROADS OR THE CONSTRUCTION OF PLATFORMS, HELICOPTER LANDING STAGES, SIGNS, SNOW FENCES, OR THE LIKE": {
+   "short": "E01F 道路附加工作（設施、標誌）",
+   "full": "E01F 附加工作，例如道路設施，或月台、直升機降落台、標誌、防雪柵等的建造"
+  },
+  "E01H STREET CLEANING CLEANING OF PERMANENT WAYS CLEANING BEACHES DISPERSING OR PREVENTING FOG IN GENERAL CLEANING STREET OR RAILWAY FURNITURE OR TUNNEL WALLS cleaning in general B08B": {
+   "short": "E01H 街道、軌道或海灘的清掃",
+   "full": "E01H 街道清掃；永久軌道的清掃；海灘清理；一般的驅霧或防霧；街道或鐵路設施或隧道壁的清潔（一般清潔見 B08B）"
+  },
+  "E02 HYDRAULIC ENGINEERING FOUNDATIONS SOIL SHIFTING": "E02 水利工程；基礎；土方工程",
+  "E03 WATER SUPPLY SEWERAGE": "E03 給水；排水",
+  "E04 BUILDING": "E04 建築物",
+  "E05 LOCKS KEYS WINDOW OR DOOR FITTINGS SAFES": "E05 鎖；鑰匙；門窗零件；保險箱",
+  "E06 DOORS, WINDOWS, SHUTTERS, OR ROLLER BLINDS IN GENERAL LADDERS": {
+   "short": "E06 門、窗、百葉窗；梯子",
+   "full": "E06 一般的門、窗、百葉窗或捲簾；梯子"
+  },
+  "E04B GENERAL BUILDING CONSTRUCTIONS WALLS, e.g. PARTITIONS ROOFS FLOORS CEILINGS INSULATION OR OTHER PROTECTION OF BUILDINGS border constructions of opening in walls, floors or ceilings E06B1/00 ; electromagnetic shielding H05K9/0001": {
+   "short": "E04B 一般建築構造；牆；屋頂",
+   "full": "E04B 一般建築物構造；牆，例如隔牆；屋頂；樓板；天花板；建築物的隔熱或其他防護（牆、樓板或天花板開口的邊框構造見 E06B1/00；電磁屏蔽見 H05K9/0001）"
+  },
+  "E04C STRUCTURAL ELEMENTS BUILDING MATERIALS for bridges E01D ; specially designed for insulation or other protection E04B ; elements used as building aids E04G ; for mining E21 ; for tunnels E21D ; structural elements with broader range of application than for building engineering F16 , particularly F16S": {
+   "short": "E04C 結構構件；建築材料",
+   "full": "E04C 結構構件；建築材料（橋梁用見 E01D；專門用於隔熱或其他防護見 E04B；作為施工輔助的構件見 E04G；採礦用見 E21；隧道用見 E21D；應用範圍比建築工程更廣的結構構件見 F16，特別是 F16S）"
+  },
+  "E04D ROOF COVERINGS SKY-LIGHTS GUTTERS ROOF-WORKING TOOLS coverings of outer walls by plaster or other porous material E04F13/00": {
+   "short": "E04D 屋面覆蓋層；天窗；簷槽",
+   "full": "E04D 屋面覆蓋層；天窗；簷槽；屋面施工工具（以灰泥或其他多孔材料覆蓋外牆見 E04F13/00）"
+  },
+  "E04F FINISHING WORK ON BUILDINGS, e.g. STAIRS, FLOORS windows, doors E06B": {
+   "short": "E04F 建築物的修整工作",
+   "full": "E04F 建築物的修整工作，例如樓梯、地板（窗、門見 E06B）"
+  },
+  "E04G SCAFFOLDING FORMS SHUTTERING BUILDING IMPLEMENTS OR AIDS, OR THEIR USE HANDLING BUILDING MATERIALS ON THE SITE REPAIRING, BREAKING-UP OR OTHER WORK ON EXISTING BUILDINGS": {
+   "short": "E04G 腳手架；模板；施工輔助",
+   "full": "E04G 腳手架；模板；模殼；施工用具或輔助設備及其使用；建築材料的現場搬運；現有建築物的修理、拆除或其他工作"
+  },
+  "E04H BUILDINGS OR LIKE STRUCTURES FOR PARTICULAR PURPOSES SWIMMING OR SPLASH BATHS OR POOLS MASTS FENCING TENTS OR CANOPIES, IN GENERAL foundations E02D": {
+   "short": "E04H 專門用途的建築物",
+   "full": "E04H 專門用途的建築物或類似構築物；游泳池或戲水池；桅桿；圍欄；一般的帳篷或天篷（基礎見 E02D）"
+  },
+  "A01K1/0005 Stable partitions devices for fastening animals A01K1/06 ; pasturing enclosures A01K3/00": {
+   "short": "A01K1/0005 廄欄隔板",
+   "full": "A01K1/0005 廄欄隔板（拴繫動物的裝置見 A01K1/06；放牧圍欄見 A01K3/00）"
+  },
+  "A01K1/0035 Transportable or mobile animal shelters": {
+   "short": "A01K1/0035 可移動的動物棚舍",
+   "full": "A01K1/0035 可搬運或可移動的動物棚舍"
+  },
+  "A01K1/0041 Rotary, round or circular animal barns": {
+   "short": "A01K1/0041 迴轉式或圓形畜舍",
+   "full": "A01K1/0041 迴轉式、圓形或環形畜舍"
+  },
+  "A01K1/0047 Air-conditioning, e.g. ventilation, of animal housings Laboratory cage ventilation A01K1/0313 ; Cat or dog houses with climate control means A01K1/0335": {
+   "short": "A01K1/0047 畜舍的空調、通風",
+   "full": "A01K1/0047 畜舍的空調，例如通風（實驗室籠的通風見 A01K1/0313；有溫控裝置的貓狗屋見 A01K1/0335）"
+  },
+  "A01K1/0088 Animal shelters especially adapted for keeping young cattle, i.e. calves": {
+   "short": "A01K1/0088 小牛專用畜舍",
+   "full": "A01K1/0088 專門飼養幼牛（即小牛）的畜舍"
+  },
+  "A01K1/0094 Animal shelters or barns especially adapted for keeping horses": {
+   "short": "A01K1/0094 馬廄",
+   "full": "A01K1/0094 專門飼養馬的畜舍或馬廄"
+  },
+  "A01K1/01 Removal of dung or urine ; Removal of manure from stables A01K1/015 takes precedence": {
+   "short": "A01K1/01 糞尿的清除",
+   "full": "A01K1/01 糞尿的清除；畜舍廄肥的清除（優先適用 A01K1/015）"
+  },
+  "A01K1/015 Floor coverings, e.g. bedding-down sheets ; Stable floors": {
+   "short": "A01K1/015 墊料；畜舍地板",
+   "full": "A01K1/015 地面覆蓋物，例如墊料；畜舍地板"
+  },
+  "A01K1/02 Pigsties Dog-kennels Rabbit-hutches or the like": {
+   "short": "A01K1/02 豬舍；狗屋；兔籠",
+   "full": "A01K1/02 豬舍；狗屋；兔籠或類似物"
+  },
+  "A01K1/04 Tethering-poles or the like": "A01K1/04 拴繫柱或類似物",
+  "A01K1/06 Devices for fastening animals, e.g. halters, toggles, neck-bars or chain fastenings": {
+   "short": "A01K1/06 拴繫動物的裝置",
+   "full": "A01K1/06 拴繫動物的裝置，例如籠頭、套栓、頸桿或鏈條"
+  },
+  "A01K1/08 Arrangements for simultaneously releasing several animals": {
+   "short": "A01K1/08 同時放出多頭動物",
+   "full": "A01K1/08 同時放出多頭動物的裝置"
+  },
+  "A01K1/10 Feed racks": "A01K1/10 飼料架",
+  "A01K1/12 Milking stations": "A01K1/12 擠奶站",
+  "A01K3/00 Pasturing equipment, e.g. tethering devices Grids for preventing cattle from straying Electrified wire fencing electric circuits or apparatus for supplying electric wire fencing H05C": {
+   "short": "A01K3/00 放牧設備；電圍欄",
+   "full": "A01K3/00 放牧設備，例如拴繫裝置；防止牛群走失的格柵；電圍欄（電圍欄的供電電路或裝置見 H05C）"
+  },
+  "A01K5/00 Feeding devices for stock or game A01K1/10 takes precedence; feeding devices for poultry or other birds A01K39/00 ; Feeding wagons; Feeding stacks": {
+   "short": "A01K5/00 家畜的餵食裝置",
+   "full": "A01K5/00 家畜或獵物的餵食裝置（優先適用 A01K1/10；家禽或其他鳥類的餵食裝置見 A01K39/00）；餵料車；飼料堆"
+  },
+  "A01K7/00 Watering equipment for stock or game": {
+   "short": "A01K7/00 家畜的給水設備",
+   "full": "A01K7/00 家畜或獵物的給水設備"
+  },
+  "A01K9/00 Sucking apparatus for young stock ; Devices for mixing solid food with liquids": {
+   "short": "A01K9/00 幼畜哺乳器",
+   "full": "A01K9/00 幼畜哺乳器；固體飼料與液體的混合裝置"
+  },
+  "A01K11/00 Marking of animals marking poultry or other birds A01K35/00": {
+   "short": "A01K11/00 動物的標記",
+   "full": "A01K11/00 動物的標記（家禽或其他鳥類的標記見 A01K35/00）"
+  },
+  "A01K13/00 Devices for grooming or caring of animals, e.g. curry-combs Fetlock rings Tail-holders as part of the harness B68B5/04 Devices for preventing crib-biting Washing devices Protection against weather conditions or insects": {
+   "short": "A01K13/00 動物的梳理或照護裝置",
+   "full": "A01K13/00 動物的梳理或照護裝置，例如馬梳；距毛環；尾巴固定器（作為挽具一部分的見 B68B5/04）；防止咬槽癖的裝置；清洗裝置；防天候或防蟲"
+  },
+  "A01K14/00 Removing the fleece from live sheep or similar animals hand-held clippers or shavers with a plurality of cutting edges, specially adapted for shearing animals, e.g. sheep, B26B19/24": {
+   "short": "A01K14/00 活羊的剪毛",
+   "full": "A01K14/00 活羊或類似動物的剪毛（專門用於剪動物毛，例如羊毛，的多刃手持剪或剃刀見 B26B19/24）"
+  },
+  "A01K15/00 Devices for taming animals, e.g. nose-rings or hobbles Devices for overturning animals in general Training or exercising equipment Covering boxes": {
+   "short": "A01K15/00 馴服動物的裝置",
+   "full": "A01K15/00 馴服動物的裝置，例如鼻環或腳絆；一般使動物翻倒的裝置；訓練或運動設備；配種箱"
+  },
+  "A01K17/00 Dehorners Horn trainers": "A01K17/00 去角器；角形矯正器",
+  "A01K19/00 Weaning apparatus": "A01K19/00 斷奶裝置",
+  "A01K21/00 Devices for assisting or preventing mating": "A01K21/00 協助或防止交配的裝置",
+  "A01K23/00 Manure or urine pouches": "A01K23/00 糞袋或尿袋",
+  "A01K25/00 Muzzles": "A01K25/00 嘴套",
+  "A01K27/00 Leads or collars, e.g. for dogs": {
+   "short": "A01K27/00 牽繩或項圈",
+   "full": "A01K27/00 牽繩或項圈，例如狗用"
+  },
+  "A01K29/00 Other apparatus for animal husbandry": "A01K29/00 畜牧業的其他裝置",
+  "A01K29/002 for monitoring or measuring size or weight of the animal, e.g. monitoring growth": {
+   "short": "A01K29/002 監測動物體型或體重",
+   "full": "A01K29/002 用於監測或測量動物的體型或體重，例如監測生長"
+  },
+  "A01K29/004 for influencing biological activity": {
+   "short": "A01K29/004 影響生物活動",
+   "full": "A01K29/004 用於影響生物活動"
+  },
+  "A01K29/005 Monitoring or measuring activity": "A01K29/005 監測或測量活動"
+ }
+}

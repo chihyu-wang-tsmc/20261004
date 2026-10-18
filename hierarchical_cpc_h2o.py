@@ -9,6 +9,7 @@ greedy / K=3 beam search、表格和 SVG）一行都沒改，結果可以直接�
     跟 jevk5 共用同一個檔會把 jevk5 的答案當成 h2o 的。
   * CPC zip 直接讀 hierarchical_cpc/datasets/ 那份（已入版控），不另外存一份。
   * SVG 左上角寫 H2O-LIGHTNING。
+  * 每次跑完，除了英文的 <slug>_tree.svg，另外產生中文版 <slug>_tree_zh.svg（見 hierarchical_svg_zh.py）。
 
 官網跟 hierarchical_cpc.py 不同的地方（CPC 網址改 archive、cooksafe.JsonCache、RetryPolicy、
 IPython display、只留 CPC）見 hierarchical_cpc.py 開頭，這裡做法相同。
@@ -45,6 +46,7 @@ from langchain_typesafe.client import (
 )
 
 from classifier_h2o import H2OClassifier
+from hierarchical_svg_zh import write_zh_svg
 
 OUT_DIR = Path(__file__).resolve().with_name("hierarchical_cpc_h2o")
 # CPC zip 和 jevk5 版共用 hierarchical_cpc/datasets/ 那份
@@ -618,6 +620,7 @@ def main() -> None:
     for hierarchy, result in zip(HIERARCHIES, results, strict=True):
         svg_path: Path = OUT_DIR / f"{hierarchy.slug}_tree.svg"
         render_svg(hierarchy, result, svg_path)
+        write_zh_svg(hierarchy.slug, svg_path)  # 另外產生中文版 <slug>_tree_zh.svg
         beam_path: tuple[str, ...] = tuple(result["beam"][0]["path"])
         greedy_path: tuple[str, ...] = tuple(result["greedy"]["path"])
         beam_leaf: str = beam_path[-1]

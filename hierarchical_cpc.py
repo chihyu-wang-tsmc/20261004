@@ -18,6 +18,7 @@ jevk5-serve 要開在 8090。用法：
   * IPython 的 display(Markdown(...)) 換成 print，同時寫進 results.md。
   * 下載檔、快取、SVG、results.md 都放在 hierarchical_cpc/ 底下。
   * SVG 左上角的 TYPESAFE 改成 JEVK5，免得跟官網的圖搞混。
+  * 每次跑完，除了英文的 <slug>_tree.svg，另外產生中文版 <slug>_tree_zh.svg（見 hierarchical_svg_zh.py）。
 
 官網的結果（Jev）：greedy 走到 E99Z99/00（錯），beam K=3 走到 A01K31/12（對）。
 """
@@ -44,6 +45,7 @@ from langchain_typesafe.client import (
 )
 
 from classifier_jevk5 import JevK5Classifier
+from hierarchical_svg_zh import write_zh_svg
 
 OUT_DIR = Path(__file__).resolve().with_name("hierarchical_cpc")
 
@@ -615,6 +617,7 @@ def main() -> None:
     for hierarchy, result in zip(HIERARCHIES, results, strict=True):
         svg_path: Path = OUT_DIR / f"{hierarchy.slug}_tree.svg"
         render_svg(hierarchy, result, svg_path)
+        write_zh_svg(hierarchy.slug, svg_path)  # 另外產生中文版 <slug>_tree_zh.svg
         beam_path: tuple[str, ...] = tuple(result["beam"][0]["path"])
         greedy_path: tuple[str, ...] = tuple(result["greedy"]["path"])
         beam_leaf: str = beam_path[-1]
