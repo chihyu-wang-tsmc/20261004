@@ -52,3 +52,10 @@ classifying_rag_passages_h2o/
 # basic_memory_*.py 的回答快取和 playground.json，每次跑都會重生
 basic_memory_jevk5/
 basic_memory_h2o/
+
+# skill_suggestion_*.py 的分類器快取、圖、playground 題目，每次跑都會重生
+skill_suggestion_jevk5/
+skill_suggestion_h2o/
+# 兩版共用的 agent 回答快取、產生 requests.json 時的中間檔（requests.json 本身要留）
+skill_suggestion/agent_cache.*
+skill_suggestion/requests_cache.*
