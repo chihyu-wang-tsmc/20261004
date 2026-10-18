@@ -40,3 +40,7 @@ hierarchical_biomedical_jevk5_path/json_cache.*
 # function_calling_*.py 的回答快取、圖、playground 題目，每次跑都會重生
 function_calling_jevk5/
 function_calling_h2o/
+
+# classifying_rag_passages_*.py 的快取（embedding、四題的答案、回答）、圖、playground 題目，每次跑都會重生
+classifying_rag_passages_jevk5/
+classifying_rag_passages_h2o/
