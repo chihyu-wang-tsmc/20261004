@@ -40,3 +40,10 @@ hierarchical_biomedical_jevk5_path/json_cache.*
 # function_calling_*.py 的回答快取、圖、playground 題目，每次跑都會重生
 function_calling_jevk5/
 function_calling_h2o/
+
+# skill_suggestion_*.py 的分類器快取、圖、playground 題目，每次跑都會重生
+skill_suggestion_jevk5/
+skill_suggestion_h2o/
+# 兩版共用的 agent 回答快取、產生 requests.json 時的中間檔（requests.json 本身要留）
+skill_suggestion/agent_cache.*
+skill_suggestion/requests_cache.*
