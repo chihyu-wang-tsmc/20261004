@@ -67,3 +67,7 @@ sde_cascade_jevk5/
 sde_cascade_h2o/
 # 兩版共用的 gpt-5.5 擷取快取
 sde_cascade/extract_cache.*
+
+# box_*.py 切出來的圖、畫了框的圖、request.json，每次跑都會重生（box/ 的三張照片和 SOURCES.md 要留）
+box_jevk5/
+box_h2o/
