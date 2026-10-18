@@ -40,3 +40,7 @@ hierarchical_biomedical_jevk5_path/json_cache.*
 # function_calling_*.py 的回答快取、圖、playground 題目，每次跑都會重生
 function_calling_jevk5/
 function_calling_h2o/
+
+# citation_check_*.py 的回答快取、playground 題目，每次跑都會重生（citation_check/ 的 RFC 和 citations.json 要留）
+citation_check_jevk5/
+citation_check_h2o/
