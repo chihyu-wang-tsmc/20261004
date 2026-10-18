@@ -36,6 +36,8 @@ hierarchical_biomedical_h2o_path/json_cache.*
 hierarchical_cpc_jevk5_path/json_cache.*
 hierarchical_shopify_jevk5_path/json_cache.*
 hierarchical_biomedical_jevk5_path/json_cache.*
+hierarchical_biomedical_h2o_hard/json_cache.*
+hierarchical_biomedical_jevk5_hard/json_cache.*
 
 # function_calling_*.py 的回答快取、圖、playground 題目，每次跑都會重生
 function_calling_jevk5/
