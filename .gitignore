@@ -59,3 +59,9 @@ skill_suggestion_h2o/
 # 兩版共用的 agent 回答快取、產生 requests.json 時的中間檔（requests.json 本身要留）
 skill_suggestion/agent_cache.*
 skill_suggestion/requests_cache.*
+
+# sde_cascade_*.py 的驗證器快取和 playground.json，每次跑都會重生
+sde_cascade_jevk5/
+sde_cascade_h2o/
+# 兩版共用的 gpt-5.5 擷取快取
+sde_cascade/extract_cache.*
