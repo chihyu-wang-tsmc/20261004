@@ -52,7 +52,16 @@ Box 預設是關的（box 題會回 400），而且要 generate-mode 的 vLLM，
 用法：
     python box_h2o.py
     H2O_ENDPOINT=http://127.0.0.1:8741 python box_h2o.py   # 指定服務網址
-切出來的圖、畫了框的圖、request.json 放在 box_h2o/。
+輸出都放在 box_h2o/：request.json、切出來的圖（mug.jpg、tile-*.jpg、edge-check-*.jpg 等），
+以及畫上預測框的圖（官網沒有，方便用眼睛看；框旁標題目名稱和 confidence，左上角寫是哪一題）：
+  pred-mug.jpg                     Response structure 的框（confidence 低時加上往外推過的橘框）
+  pred-visible-kitchen.jpg         「Box 一定回一個框」兩張圖各自的框，mug_visible 低（不理這個框）的畫灰色
+  pred-visible-kitchen-no-mug.jpg
+  pred-cabinet.jpg                 兩個杯子的圖上 mug（紅）和 mug_right（橘）的框
+  pred-cabinet-halves.jpg          切成兩半（藍）再問，每一半的框換算回整張圖（紅）
+  pred-tile.jpg                    挑中的 tile（藍）、從 tile 換算回來的框（紅）、直接問的框（灰）
+  pred-edge-check.jpg              edge questions 每一輪問的框，最後的框綠色
+  pred-edge-check-cut.jpg          故意切掉右邊 40% 的那組，原本的框灰色
 """
 
 import base64
@@ -71,7 +80,7 @@ from langchain_typesafe.client import (
     TypeSafeRateLimitError,
 )
 from langchain_typesafe.types import ChoiceAnswer, ScoreAnswer
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel, Field, JsonValue
 
 from classifier_h2o import (
@@ -317,6 +326,68 @@ def show_box(answer: dict) -> str:
     return text
 
 
+# ---- 官網沒有：把預測的框畫在圖上，存成 pred-*.jpg ----
+
+LIGHT = {"lime", "gold", "orange", "yellow"}  # 這些底色上的字用黑色，其他用白色
+
+
+def label_font(size: int) -> ImageFont.ImageFont:
+    """Pillow 10.1 之後 load_default 可以指定大小（Pillow 內建的字型，不用找系統字型）；更舊的退回小點陣字。"""
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def tag_text(name: str, answer: dict) -> str:
+    """框的標籤：題目名稱加 confidence，例如 "mug 0.92"。"""
+    conf = answer.get("confidence")
+    return name if conf is None else f"{name} {conf:.2f}"
+
+
+def annotate(
+    image: Image.Image, marks: list[tuple[str, dict, str]], name: str, title: str = ""
+) -> Path:
+    """把框畫在圖上，存成 OUT_DIR / name。
+
+    marks 是 (標籤, 四邊, 顏色)：框用那個顏色畫，標籤貼在框的左上角外側（上面放不下就放進框裡），
+    跟別的標籤重疊時往下排。title 印在圖的左上角，說明這張圖是哪一題。
+    """
+    image = image.convert("RGB")  # convert 會複製一份，不動原圖
+    pen = ImageDraw.Draw(image)
+    font = label_font(max(14, round(min(image.size) / 32)))
+    line = max(2, round(min(image.size) / 200))
+    pad = 3
+    placed = []  # 已經貼好的標籤 (x0, y0, x1, y1)
+
+    def tag(text: str, x: int, y: int, color: str, above: bool) -> None:
+        left, top, right, bottom = pen.textbbox((0, 0), text, font=font)
+        w, h = right - left + 2 * pad, bottom - top + 2 * pad
+        if above:
+            y = y - h if y - h >= 0 else y + line
+        x, y = min(max(0, x), image.width - w), min(max(0, y), image.height - h)
+        while y + 2 * h <= image.height and any(
+            x < x1 and x0 < x + w and y < y1 and y0 < y + h for x0, y0, x1, y1 in placed
+        ):
+            y += h
+        placed.append((x, y, x + w, y + h))
+        pen.rectangle((x, y, x + w, y + h), fill=color)
+        ink = "black" if color in LIGHT else "white"
+        pen.text((x + pad - left, y + pad - top), text, fill=ink, font=font)
+
+    for _, edges, color in marks:
+        pen.rectangle(pixels(image, edges), outline=color, width=line)
+    if title:
+        tag(title, 0, 0, "black", above=False)
+    for text, edges, color in marks:  # 框都畫完才貼標籤，標籤不會被別的框壓到
+        if text:
+            x0, y0, _, _ = pixels(image, edges)
+            tag(text, x0, y0, color, above=True)
+    path = OUT_DIR / name
+    image.save(path, "JPEG", quality=90)
+    return path
+
+
 # ---- ## Request structure ----
 
 
@@ -395,6 +466,13 @@ def reading_a_box(response: dict) -> dict:
         print(
             f"confidence {mug['confidence']:.2f} >= {MIN_CONFIDENCE}: the box is used as is"
         )
+
+    # 官網沒有：預測的框（confidence 低時加上往外推過的框）畫在 kitchen.jpg 上
+    marks = [(tag_text("mug", mug), mug["box"], "red")]
+    if mug["confidence"] < MIN_CONFIDENCE:
+        marks.append((f"padded +{PAD}", edges, "orange"))
+    path = annotate(image, marks, "pred-mug.jpg", 'Box: "the coffee mug in `photo`"')
+    print(f"\npredicted box drawn on kitchen.jpg -> {path}")
     return mug["box"]
 
 
@@ -432,6 +510,14 @@ def always_a_box() -> None:
         action = "use the box" if visible >= YES else "ignore the box"
         print(f"{name:<20} mug_visible {visible:.2f} -> {action}")
         print(f"{'':<20} mug  {show_box(mug)}")
+        # 官網沒有：框畫在圖上，Noul 說不在（不理這個框）的畫灰色
+        path = annotate(
+            Image.open(DATA_DIR / name),
+            [(tag_text("mug", mug), mug["box"], "red" if visible >= YES else "gray")],
+            f"pred-visible-{name}",
+            f"mug_visible {visible:.2f} -> {action}",
+        )
+        print(f"{'':<20} -> {path}")
 
 
 def one_box_per_question() -> None:
@@ -465,6 +551,21 @@ def one_box_per_question() -> None:
     )
     print(f"  mug        {show_box(answers['mug'])}")
     print(f"  mug_right  {show_box(answers['mug_right'])}")
+    # 官網沒有：mug（紅）和 mug_right（橘）兩個框畫在 cabinet.jpg 上
+    path = annotate(
+        image,
+        [
+            (tag_text("mug", answers["mug"]), answers["mug"]["box"], "red"),
+            (
+                tag_text("mug_right", answers["mug_right"]),
+                answers["mug_right"]["box"],
+                "darkorange",
+            ),
+        ],
+        "pred-cabinet.jpg",
+        f"mug_count {answers['mug_count']['choice']}",
+    )
+    print(f"  -> {path}")
     if answers["mug_count"]["choice"] != "several":
         return
 
@@ -474,7 +575,7 @@ def one_box_per_question() -> None:
         "left half": {"left": 0.0, "top": 0.0, "right": 0.5, "bottom": 1.0},
         "right half": {"left": 0.5, "top": 0.0, "right": 1.0, "bottom": 1.0},
     }
-    found = []
+    found, marks = [], []  # found：換算回整張圖的框；marks：畫圖用
     for label, region in halves.items():
         ref, half = asset_of(
             image.crop(pixels(image, region)), f"cabinet-{label.split()[0]}.jpg"
@@ -492,12 +593,19 @@ def one_box_per_question() -> None:
         choice = response["answers"]["mug_count"]["choice"]
         mug = response["answers"]["mug"]
         print(f"  {label:<11} mug_count {choice:<8} {show_box(mug)}")
+        marks.append((f"{label}: {choice}", region, "blue"))
         if choice == "one":
             found.append(to_full(mug["box"], region))
+            marks.append((tag_text(f"mug {len(found)}", mug), found[-1], "red"))
         elif choice == "several":
             print(f"  {'':<11} still several: split this half again")
     for i, edges in enumerate(found, 1):
         print(f"  mug {i} in the full image  {show(edges)}")
+    # 官網沒有：兩半（藍）和每一半找到的框換算回整張圖（紅）
+    path = annotate(
+        image, marks, "pred-cabinet-halves.jpg", "split into halves, boxes mapped back"
+    )
+    print(f"  -> {path}")
 
 
 def small_targets(direct: dict) -> None:
@@ -548,10 +656,28 @@ def small_targets(direct: dict) -> None:
     print(f"  in the tile        {show_box(mug)}")
     print(f"  in the full image  {show(full)}")
     print(f"  IoU with the box asked on the full image: {iou(full, direct):.2f}")
+    # 官網沒有：挑中的 tile（藍）、從 tile 換算回來的框（紅）、Response structure 直接問的框（灰）
+    path = annotate(
+        image,
+        [
+            (f"tile {chosen}", tiles[chosen], "blue"),
+            ("direct", direct, "gray"),
+            (tag_text("mug via tile", mug), full, "red"),
+        ],
+        "pred-tile.jpg",
+        f"tile: {chosen}, IoU with direct {iou(full, direct):.2f}",
+    )
+    print(f"  -> {path}")
 
 
-def check_edges(image: Image.Image, edges: dict, name: str, rounds: int = 3) -> dict:
-    """切到框裡，每一邊問一題 Noul；超出的那幾邊各往外推 PAD 再問，最多 rounds 輪。"""
+def check_edges(
+    image: Image.Image, edges: dict, name: str, rounds: int = 3
+) -> tuple[dict, list[dict]]:
+    """切到框裡，每一邊問一題 Noul；超出的那幾邊各往外推 PAD 再問，最多 rounds 輪。
+
+    回傳最後的框，和每一輪問的框（畫圖用）。
+    """
+    history = []
     questions = {
         f"past_{edge}": Noul(
             instructions=f"Does the mug in `crop` continue past the {edge} edge of the image?"
@@ -559,6 +685,7 @@ def check_edges(image: Image.Image, edges: dict, name: str, rounds: int = 3) -> 
         for edge in EDGES
     }
     for round_ in range(1, rounds + 1):
+        history.append(edges)
         ref, crop = asset_of(image.crop(pixels(image, edges)), f"{name}-{round_}.jpg")
         response = ask(
             {"state": {"crop": ref}, "assets": {ref: crop}, "questions": questions}
@@ -571,7 +698,7 @@ def check_edges(image: Image.Image, edges: dict, name: str, rounds: int = 3) -> 
         out = [e for e in EDGES if past[e] >= YES and edges[e] != limit[e]]
         if not out:
             print("           no edge cuts the mug: done")
-            return edges
+            return edges, history
         print(f"           move out: {', '.join(out)}")
         edges = {
             **edges,
@@ -579,38 +706,57 @@ def check_edges(image: Image.Image, edges: dict, name: str, rounds: int = 3) -> 
             **{e: min(1.0, edges[e] + PAD) for e in out if e in ("right", "bottom")},
         }
     print(f"           stopped after {rounds} rounds")
-    return edges
+    return edges, history
 
 
-def edge_questions(direct: dict) -> dict:
+def draw_rounds(
+    image: Image.Image,
+    history: list[dict],
+    final: dict,
+    name: str,
+    title: str,
+    marks: list[tuple[str, dict, str]] = (),
+) -> Path:
+    """edge questions 每一輪問的框（紅、橘、紫輪流），最後的框綠色；marks 是額外要畫的參考框。"""
+    colors = ("red", "darkorange", "purple")
+    rounds = [
+        (f"round {i}", edges, colors[(i - 1) % len(colors)])
+        for i, edges in enumerate(history, 1)
+    ]
+    if final == history[-1]:  # 最後一輪沒有邊要推，最後的框就是那一輪的框
+        rounds[-1] = (f"round {len(history)} = final", final, "lime")
+    else:
+        rounds.append(("final", final, "lime"))
+    return annotate(image, [*marks, *rounds], name, title)
+
+
+def edge_questions(direct: dict) -> None:
     print("\n### Check a box with edge questions\n")
     image = Image.open(DATA_DIR / "kitchen.jpg")
     print("the box from Response structure:")
-    checked = check_edges(image, direct, "edge-check")
+    checked, history = check_edges(image, direct, "edge-check")
+    path = draw_rounds(
+        image,
+        history,
+        checked,
+        "pred-edge-check.jpg",
+        "edge questions on the Box answer",
+    )
+    print(f"  -> {path}")
     # 官網沒有這段的程式，照它最後一段的測法：故意切掉目標的一塊，看 edge questions 抓不抓得到。
     # 這裡把右邊往內收 40%，杯子的把手在右邊
     cut = {**direct, "right": direct["left"] + 0.6 * (direct["right"] - direct["left"])}
     print("\nthe same box with its right 40% cut off (the handle is on the right):")
-    check_edges(image, cut, "edge-check-cut")
-    return checked
-
-
-# ---- 官網沒有：把幾種框畫在原圖上，方便用眼睛看 ----
-
-
-def draw(direct: dict, checked: dict) -> None:
-    image = Image.open(DATA_DIR / "kitchen.jpg").convert("RGB")
-    pen = ImageDraw.Draw(image)
-    for edges, color in (
-        (checked, "lime"),
-        (direct, "red"),
-    ):  # 紅框後畫，重疊的邊看得到紅色
-        pen.rectangle(pixels(image, edges), outline=color, width=3)
-    path = OUT_DIR / "kitchen-boxes.jpg"
-    image.save(path, "JPEG", quality=90)
-    print(
-        f"\nred: the box from Response structure, green: after the edge questions -> {path}"
+    checked, history = check_edges(image, cut, "edge-check-cut")
+    path = draw_rounds(
+        image,
+        history,
+        checked,
+        "pred-edge-check-cut.jpg",
+        "edge questions on a box with its right 40% cut off",
+        [("Box answer", direct, "gray")],
     )
+    print(f"  -> {path}")
 
 
 def main() -> None:
@@ -622,8 +768,7 @@ def main() -> None:
     always_a_box()
     one_box_per_question()
     small_targets(direct)
-    checked = edge_questions(direct)
-    draw(direct, checked)
+    edge_questions(direct)
 
 
 if __name__ == "__main__":
