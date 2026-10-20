@@ -76,3 +76,7 @@ box_h2o/
 
 # images_h2o.py 切出來的圖、Preparing images 的輸入和輸出、畫了框的圖，每次跑都會重生（images/ 的照片、合成圖和 SOURCES.md 要留）
 images_h2o/
+
+# classifying_rag_passages_h2o_{qwen,nemotron}.py（開源 embedding 版）的快取、圖、playground 題目，每次跑都會重生
+classifying_rag_passages_h2o_qwen/
+classifying_rag_passages_h2o_nemotron/
