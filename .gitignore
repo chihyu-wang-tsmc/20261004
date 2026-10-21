@@ -14,6 +14,8 @@ deep20_guard_report/tables*.xlsx
 deep20_guard_report/tradeoff*.png
 deep20_guard_report_h2o/tables*.xlsx
 deep20_guard_report_h2o/tradeoff*.png
+deep20_guard_report_h2o_jevk5/tables*.xlsx
+deep20_guard_report_h2o_jevk5/tradeoff*.png
 
 # LiveCodeBench 的題目檔，129MB，超過 GitHub 單檔 100MB 上限
 test6.jsonl
