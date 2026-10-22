@@ -75,13 +75,10 @@ guard_policy / guard_thresholds 由 deep20_h2o.build_result 記。
 
 ---- 報表 ----
 
-deep20_guard_report_h2o.py 已經登記了 measure 政策、門檻掃描也補到 1.00，指定 --results / --out 就能用：
+用 deep20_guard_report_h2o_jevk5.py（讀 deep20_h2o_jevk5_results/、寫 deep20_guard_report_h2o_jevk5/，
+政策照 result 的 meta.guard_policy，[G0] 會印沿用和截斷的題數）：
 
-    python deep20_guard_report_h2o.py report --guard-policy measure --as-policy strict \
-        --results deep20_h2o_jevk5_results --out deep20_guard_report_h2o_jevk5
-
-兩處字面會是 h2o 版的，數字不受影響：開頭那行印的 result 目錄是 h2o 版的預設值（實際讀的是
---results），「Latency／成本」那列的守門名稱印成 h2o-lightning（第二道其實是 jevk5）。
+    python deep20_guard_report_h2o_jevk5.py report --as-policy strict
 
 ---- 要先起來的東西 ----
 

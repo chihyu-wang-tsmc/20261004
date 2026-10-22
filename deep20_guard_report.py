@@ -182,6 +182,14 @@ RESULT_DIR = os.path.join(HERE, "deep20_results")
 OUT_DIR = os.path.join(HERE, "deep20_guard_report")
 # 兩道守門是誰問的，只影響報表上的字（deep20_guard_report_h2o.py 會覆寫成 h2o-lightning）
 GUARD_NAME = "jevk5"
+# 第二道是另一顆時才設（deep20_guard_report_h2o_jevk5.py：第一道 h2o-lightning、第二道 jevk5）；
+# None = 兩道同一顆，報表上的字和只有 GUARD_NAME 時一模一樣
+GUARD_NAME_OUT = None
+
+
+def guard_names():
+    """(第一道, 第二道) 是誰問的。"""
+    return GUARD_NAME, GUARD_NAME_OUT or GUARD_NAME
 
 SCHEMA = 2  # 和 deep20.py 的 SCHEMA 一致
 CATEGORIES = ("safety", "jailbreak", "injection", "cyber", "coding", "skill", "fast-powerful")
@@ -809,6 +817,9 @@ def report_matrix(rep, rows):
 
     called_frac = sum(r["g2"] is not None for r in rows) / len(rows)
     llm_frac = sum(bool(r["called_model"]) for r in rows) / len(rows)
+    g1_name, g2_name = guard_names()
+    both = (f"{1 + called_frac:.2f} 次 {g1_name}" if g1_name == g2_name
+            else f"1 次 {g1_name} + {called_frac:.2f} 次 {g2_name}")
     body = [
         row("Precision", "precision", F, "TP/(TP+FP)：被擋下的裡真的有害的比例（誤殺成本）"),
         row("Recall（TPR）", "recall", P, "TP/(TP+FN)：有害的被攔下幾成；漏網率 = 1 − Recall"),
@@ -839,9 +850,9 @@ def report_matrix(rep, rows):
          cat_cell("s1", "micro"), cat_cell("s2", "micro"),
          "四格加總再算；類別互斥，所以等於全體 F1"],
         row("ECE", "ece", lambda x: F(x, 4), "noul / out_noul 當 P(unsafe)，10 箱"),
-        ["Latency／成本", Cell(1.0, f"1 次 {GUARD_NAME}"), Cell(called_frac, f"+{called_frac:.2f} 次 {GUARD_NAME}"),
-         Cell(1.0, f"1 次 {GUARD_NAME} + {llm_frac:.2f} 次 LLM"),
-         Cell(1 + called_frac, f"{1 + called_frac:.2f} 次 {GUARD_NAME} + {llm_frac:.2f} 次 LLM"),
+        ["Latency／成本", Cell(1.0, f"1 次 {g1_name}"), Cell(called_frac, f"+{called_frac:.2f} 次 {g2_name}"),
+         Cell(1.0, f"1 次 {g1_name} + {llm_frac:.2f} 次 LLM"),
+         Cell(1 + called_frac, f"{both} + {llm_frac:.2f} 次 LLM"),
          "deep20 沒存耗時，用每題的呼叫次數代替；兩道是串行（生成前／生成後），不能合併成一次"],
     ]
     rep.table("M_總表", "", ["指標", "第一道（prompt）", "第二道（response）", "系統：只開第一道",
@@ -1045,9 +1056,11 @@ def report_system(rep, rows):
         unhelpful = sum(r[field] in ("in_block", "out_block", "refused", "empty") for r in B)
         body.append([label, F(m["precision"]), P(m["recall"]), P(m["fpr"]), F(m["f1"]),
                      P(leak / len(H) if H else None), P(unhelpful / len(B) if B else None), F(jevk5, 2)])
+    g1_name, g2_name = guard_names()
     rep.table("G5_系統", "表 C　消融：第二道值不值得", [
         "設定", "Precision", "守門 Recall", "守門 FPR", "F1", "ASR（該擋題放出有害回覆）",
-        "免擋題沒拿到答案", f"{GUARD_NAME} 次數/題"], body)
+        "免擋題沒拿到答案",
+        f"{g1_name} 次數/題" if g1_name == g2_name else f"守門次數/題（{g1_name} + {g2_name}）"], body)
     rep.note("守門 Recall / FPR 只算兩道守門擋下的；ASR 和「沒拿到答案」把模型自拒也算進去，是使用者實際感受到的\n"
              "沒有「只開第二道」或「都不開」：第一道擋下的題目沒有呼叫模型，沒有回覆可以評")
 
@@ -1111,7 +1124,7 @@ def report_groups(rep, rows):
     rep.table("G6_逐類別", "", ["評估對象", "Macro F1", "Micro F1", "列入 macro 的類別"], summary,
               ["<", ">", ">", "<"])
     rep.note("和 GuardZoo 的多標籤類別 F1 不同：這裡的類別是資料集來源，不是危害類型"
-             f"（{GUARD_NAME} 沒有逐類別的標準答案）")
+             f"（{' / '.join(dict.fromkeys(guard_names()))} 沒有逐類別的標準答案）")
     per_group(rep, rows, "category", "G6_逐類別", "逐類別結局", macro=False)
     per_group(rep, rows, "dataset", "G6_逐資料集", "逐資料集結局", macro=True)
     rep.note("macro 平均 = 每個資料集權重相同；--full 時比整體（micro）更能代表「各類攻擊都顧到」")
