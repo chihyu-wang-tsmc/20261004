@@ -11,10 +11,14 @@ coding 的標準答案是資料集層級的（deep20.py DATASETS 的 expect_codi
 
     True    該判 coding    寫程式、修程式、競賽題、要產出程式碼的資安題（HumanEval、APPS、
                            CyberSecEval-instruct、RMCBench-malcode、mitre_frr-benign…）
-    False   不該判 coding  一般問答、選擇題、文件／簡報類任務、有害請求（AdvBench、GPQA、
-                           CyberMetric、skill-queries…）
-    None    只報告         數學文字題，可以用程式解也可以不用（MathQA-Python、AIME、GSM8K），
-                           只列出 coding 率，不算進對錯
+    False   不該判 coding  一般問答、選擇題、文件／簡報類任務、有害請求、數學文字題（AdvBench、
+                           GPQA、CyberMetric、skill-queries、MathQA-Python、AIME、GSM8K…）
+    None    只報告         只列出 coding 率，不算進對錯。deep20.py 目前每個資料集都標了 True／False，
+                           只有沒存 coding_gold 的舊 result 會落在這裡
+
+數學文字題（MathQA-Python、AIME、GSM8K）是 False：交付物是一個數字，用推理就能得到，
+和 APPS／CodeContests 那種交付物本身就是程式的不同（MathQA-Python 的 gold 答案是 Python，
+但使用者送出的那段字問的是數學）。所以它們被判成 coding 會算進 FP。
 
 正類 = 該判 coding。「偵測率」就是 Recall：該判 coding 的題目裡，P ≥ 門檻的比例。
 
@@ -262,7 +266,7 @@ MOCK = [  # 資料集, 類別, 預期, P(coding) 的中心
     ("WildJailbreak-benign", "jailbreak", False, 0.1), ("deepset-PI", "injection", False, 0.08),
     ("CyberMetric", "cyber", False, 0.25), ("SecEval", "cyber", False, 0.3),
     ("skill-queries", "skill", False, 0.15), ("GPQA", "fast-powerful", False, 0.05),
-    ("MathQA-Python", "coding", None, 0.35), ("GSM8K", "fast-powerful", None, 0.2),
+    ("MathQA-Python", "coding", False, 0.35), ("GSM8K", "fast-powerful", False, 0.2),
 ]
 
 
