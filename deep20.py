@@ -1,4 +1,4 @@
-"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 50 個資料集上。
+"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 51 個資料集上。
 
 deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型到底會不會真的說出有害內容」。
 本檔補上那一段：每一題都照 deep19.py 的三步走，而且真的會呼叫 LLM。
@@ -14,7 +14,7 @@ deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型�
 三個步驟各自 batch（第 2 步還會照 model_route 分兩組），所以不是一題一題來回。
 
 ⚠ 這會真的呼叫 LLM，和 deep14 / deep18 完全不同等級的成本與時間。
-   預設 50 個資料集 × 80 題 ≈ 4000 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
+   預設 51 個資料集 × 80 題 ≈ 4080 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
    先用 --only / --category / -n 小規模試跑，確認沒問題再放大。
 
 ⚠ 高風險資料集裡「守門沒擋下」的題目會真的送進模型——這正是本檔要量的東西
@@ -52,7 +52,7 @@ deep12.py 的 run 需要三個檔案配合（deep9 的 triage_questions、deep10
 loader、deep11 的 prompt_key / SAMPLE_SEED / QUESTION_NAMES）。本檔把那些外部函式、
 加上 deep12 自己的 run 流程，全部收在一起，所以單獨一個 deep14.py 就能跑完第一階段。
 
-    python deep20.py run                                   # 50 個資料集全跑，各抽 80 題
+    python deep20.py run                                   # 51 個資料集全跑，各抽 80 題
     python deep20.py run --only AdvBench HarmBench         # 只跑這兩個
     python deep20.py run --category coding safety          # 按七個類別挑
     python deep20.py run -n 150                            # 加大樣本（已問過的會沿用）
@@ -91,7 +91,7 @@ GPQA / AI2ARC / AIME / GSM8K 這四個 fast-powerful bench 也含在 --cn 裡，
     python gpqa_routing.py answer --model gemini-3.7-flash
 
 還沒跑之前，_routing_rows() 會丟出寫明該跑什麼的 RuntimeError，cmd_run() 接住印 [skip]，
-其餘 46 個資料集照跑，不會整批停住。
+其餘 47 個資料集照跑，不會整批停住。
 
 報表：deep12.py / deep13.py 的 report 是用 pick_datasets() 的資料集名去找 <名字>.json，
 找不到帶 _cn 的那些，所以現階段它們只會算到英文版。要算中文版報表，得讓 report 也認得
@@ -101,15 +101,17 @@ _cn 的檔名（例如把 result_path 的規則一起帶過去）。
 deep20_results/，而 deep12.py / deep13.py 的 report 讀的是寫死的 deep12_results/，
 所以要算本檔的報表，得先讓它們指到 deep20_results/（改那個常數，或把目錄換名）。
 
-本檔的組成，每一段都和來源一字不差（只有兩個名字例外，見下）：
+本檔的組成，每一段都和來源一字不差（例外見下）：
     原 deep11   SAMPLE_SEED、QUESTION_NAMES、prompt_key
     原 deep19   守門問題與 guard_action()（INPUT_BATTERY / OUTPUT_BATTERY / guard_decision…）
-    原 deep10   路徑常數、各格式 loader、routing 標準答案、DS、DATASETS（50 個資料集）
+    原 deep10   路徑常數、各格式 loader、routing 標準答案、DS、DATASETS（deep10 的 50 個資料集，
+                本檔另加 MATLAB-examples）
     原 deep12   HERE/RESULT_DIR/SCHEMA/CATEGORIES/CHUNK、unpack、ask、result_path、
                 load_result、save_result、pick_datasets、sample_prompts、run_dataset、
                 build_result、cmd_run、cmd_status（即 deep12.py 的第 104-360 行）
 
-和來源唯一的差異是守門那兩個名字（邏輯一行沒動，對照 deep19 / llm_guardrails.py 時換回去就一樣）：
+和來源的差異有兩處。一是 DATASETS 多了 deep10 沒有的 MATLAB-examples（見它上面的註解）；
+二是守門那兩個名字（邏輯一行沒動，對照 deep19 / llm_guardrails.py 時換回去就一樣）：
 
     route()      → guard_action()        決定 pass / review / block
     PRECEDENCE   → ACTION_PRECEDENCE     三個動作的優先序
@@ -364,7 +366,7 @@ def model_messages(prompt, row):
 
 
 # ============================================================================
-# 來源：deep10.py —— 50 個資料集的定義與讀檔工具
+# 來源：deep10.py —— 50 個資料集的定義與讀檔工具（DATASETS 另加了 MATLAB-examples）
 # ============================================================================
 H = os.path.expanduser("~")
 SAFE = f"{H}/safety_benchmarks"
@@ -594,10 +596,10 @@ class DS:
     expect_route: str | None = None
     """這個資料集**應該**選哪個（"fast" / "powerful"）——沒有實測資料時才用的推定標籤。
 
-    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 50 個資料集剛好切成兩半，
+    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 51 個資料集剛好切成兩半，
     報表的兩節也不重疊：
         route_gold   有實測的 4 個（fast-powerful 類）→ deep10 的「之二」、deep11 的 [10]
-        expect_route 沒有實測的 46 個                 → deep10 的「之一」、deep11 的 [9]
+        expect_route 沒有實測的 47 個                 → deep10 的「之一」、deep11 的 [9]
     fast-powerful 那四個不設 expect_route：手上有真實測量就不需要猜，而且兩者會打架
     （GPQA 照 criteria 推定是 powerful，實測卻有 81% 的題目 fast 就答對了）。
 
@@ -607,7 +609,7 @@ class DS:
          safety / jailbreak / injection / cyber 全部推定 fast（短的單一請求）。
       b) 使用者指定的政策，不是 criteria 的字面解讀：
          * skill 類（skill-queries）一律 powerful：產出完整交付物。
-         * coding 類全部 11 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
+         * coding 類全部 12 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
            SecurityEval / CyberSecEval instruct,autocomplete 這些「單一小函式」的題目——
            照 criteria 字面它們算 fast，但政策上程式正確性值得一律送大 model。
 
@@ -697,6 +699,11 @@ DATASETS = [
     # 沒有要求任何攻擊能力，所以 refuse 預期免擋。
     DS("CyberSecEval-instruct", "coding", lambda: json_list_col(f"{CYBER}/CyberSecEval/instruct/instruct.json", "test_case_prompt"), False, True, expect_route="powerful"),
     DS("CyberSecEval-autocomplete", "coding", lambda: json_list_col(f"{CYBER}/CyberSecEval/autocomplete/autocomplete.json", "test_case_prompt"), False, True, expect_route="powerful"),
+    # MATLAB-examples 是本檔另加的（deep10 沒有）：100 題 MATLAB 寫程式請求，主題取自 MathWorks 的範例資料集
+    # （patients.mat、fisheriris.mat、outages.csv…）。題目是依題型表寫出來的，不是真實使用者的請求；
+    # 來源和題數分配見 repo 的 MATLAB-examples/README.md。要先把那個資料夾複製到 ~/code_benchmarks/ 才讀得到。
+    # --cn 要另外準備 ~/code_benchmarks_cn/MATLAB-examples/prompts.jsonl（題數、順序和英文版一樣），沒有就會 [skip]。
+    DS("MATLAB-examples", "coding", lambda: jsonl_col(f"{CODE}/MATLAB-examples/prompts.jsonl", "prompt"), False, True, expect_route="powerful"),
     # ---- skill：agent 技能的正常請求，無害 ----
     DS("skill-queries", "skill", lambda: [json.loads(l)["user_query"] for l in open(SKILL)], False, False, expect_route="powerful"),
     # ---- fast-powerful：有 model_route 標準答案的 benchmark，都是無害的學科題 ----
@@ -1014,7 +1021,7 @@ def cmd_run(args):
         try:
             res, n_new = run_dataset(d, args, classifier)
         except Exception as e:  # noqa: BLE001
-            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 49 個跟著停
+            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 50 個跟著停
             print(f"[skip] {d.name}: {type(e).__name__}: {e}")
             continue
         if res is None:

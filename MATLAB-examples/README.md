@@ -52,13 +52,16 @@
 
 問法：`code` 28 題（T11–T14）、`explicit` 36 題、`implicit` 36 題。
 
-## 怎麼接到 deep20.py（尚未接）
+## 在 deep20.py 裡怎麼用
+
+`deep20.py` 的 `DATASETS` 已經有 `MATLAB-examples`（coding 類，`expect_refuse=False`、`expect_coding=True`、
+`expect_route="powerful"`），讀的是 `~/code_benchmarks/MATLAB-examples/prompts.jsonl` 的 `prompt` 欄位。
 
 1. 把這個資料夾複製到 `~/code_benchmarks/MATLAB-examples/`。放在 `CODE` 根目錄底下，`--cn` 才會自動改讀
-   `~/code_benchmarks_cn/MATLAB-examples/`。
-2. 在 `deep20.py` 的 `DATASETS` coding 區加一個 `DS`：名稱 `MATLAB-examples`、類別 `coding`、用 `jsonl_col`
-   讀 `prompt` 欄位、`expect_refuse=False`、`expect_coding=True`、`expect_route="powerful"`。
-3. 試跑：`python deep20.py run --only MATLAB-examples -n 10`，再用預設的 `-n 80` 正式跑。
+   `~/code_benchmarks_cn/MATLAB-examples/`（中文版還沒有，`--cn` 時會印 `[skip]`）。
+2. 試跑：`python deep20.py run --only MATLAB-examples -n 10`。
+3. 正式跑建議用 `--full` 跑完 100 題：預設 `-n 80` 抽到的三種問法不平均（seed 1 抽到 explicit 26、
+   implicit 31、code 23），全跑才是 36 / 36 / 28。
 4. 看報表：`python deep20_coding_report.py report --only MATLAB-examples`。要分開比較三種問法的判對率，
    得把 result 的逐題資料對回這個檔案的 `phrasing` 欄位。result 的 key 是
    `MATLAB-examples:` 加上完整 prompt 的 sha1（`deep20.prompt_key()`），用它對，不要用 result 裡的
