@@ -1,4 +1,4 @@
-"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 51 個資料集上。
+"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 53 個資料集上。
 
 deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型到底會不會真的說出有害內容」。
 本檔補上那一段：每一題都照 deep19.py 的三步走，而且真的會呼叫 LLM。
@@ -14,7 +14,7 @@ deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型�
 三個步驟各自 batch（第 2 步還會照 model_route 分兩組），所以不是一題一題來回。
 
 ⚠ 這會真的呼叫 LLM，和 deep14 / deep18 完全不同等級的成本與時間。
-   預設 51 個資料集 × 80 題 ≈ 4080 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
+   預設 53 個資料集 × 80 題 ≈ 4240 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
    先用 --only / --category / -n 小規模試跑，確認沒問題再放大。
 
 ⚠ 高風險資料集裡「守門沒擋下」的題目會真的送進模型——這正是本檔要量的東西
@@ -52,7 +52,7 @@ deep12.py 的 run 需要三個檔案配合（deep9 的 triage_questions、deep10
 loader、deep11 的 prompt_key / SAMPLE_SEED / QUESTION_NAMES）。本檔把那些外部函式、
 加上 deep12 自己的 run 流程，全部收在一起，所以單獨一個 deep14.py 就能跑完第一階段。
 
-    python deep20.py run                                   # 51 個資料集全跑，各抽 80 題
+    python deep20.py run                                   # 53 個資料集全跑，各抽 80 題
     python deep20.py run --only AdvBench HarmBench         # 只跑這兩個
     python deep20.py run --category coding safety          # 按七個類別挑
     python deep20.py run -n 150                            # 加大樣本（已問過的會沿用）
@@ -91,7 +91,7 @@ GPQA / AI2ARC / AIME / GSM8K 這四個 fast-powerful bench 也含在 --cn 裡，
     python gpqa_routing.py answer --model gemini-3.7-flash
 
 還沒跑之前，_routing_rows() 會丟出寫明該跑什麼的 RuntimeError，cmd_run() 接住印 [skip]，
-其餘 47 個資料集照跑，不會整批停住。
+其餘 49 個資料集照跑，不會整批停住。
 
 報表：deep12.py / deep13.py 的 report 是用 pick_datasets() 的資料集名去找 <名字>.json，
 找不到帶 _cn 的那些，所以現階段它們只會算到英文版。要算中文版報表，得讓 report 也認得
@@ -105,12 +105,13 @@ deep20_results/，而 deep12.py / deep13.py 的 report 讀的是寫死的 deep12
     原 deep11   SAMPLE_SEED、QUESTION_NAMES、prompt_key
     原 deep19   守門問題與 guard_action()（INPUT_BATTERY / OUTPUT_BATTERY / guard_decision…）
     原 deep10   路徑常數、各格式 loader、routing 標準答案、DS、DATASETS（deep10 的 50 個資料集，
-                本檔另加 MATLAB-examples）
+                本檔另加 MATLAB-examples、iOSVuln-review、iOSVuln-secure 和 ios_vuln()）
     原 deep12   HERE/RESULT_DIR/SCHEMA/CATEGORIES/CHUNK、unpack、ask、result_path、
                 load_result、save_result、pick_datasets、sample_prompts、run_dataset、
                 build_result、cmd_run、cmd_status（即 deep12.py 的第 104-360 行）
 
-和來源的差異有兩處。一是 DATASETS 多了 deep10 沒有的 MATLAB-examples（見它上面的註解）；
+和來源的差異有兩處。一是 DATASETS 多了 deep10 沒有的 MATLAB-examples、iOSVuln-review、
+iOSVuln-secure（見它們上面的註解）；
 二是守門那兩個名字（邏輯一行沒動，對照 deep19 / llm_guardrails.py 時換回去就一樣）：
 
     route()      → guard_action()        決定 pass / review / block
@@ -366,7 +367,7 @@ def model_messages(prompt, row):
 
 
 # ============================================================================
-# 來源：deep10.py —— 50 個資料集的定義與讀檔工具（DATASETS 另加了 MATLAB-examples）
+# 來源：deep10.py —— 50 個資料集的定義與讀檔工具（另加了 MATLAB-examples、iOSVuln-review、iOSVuln-secure）
 # ============================================================================
 H = os.path.expanduser("~")
 SAFE = f"{H}/safety_benchmarks"
@@ -505,6 +506,34 @@ def secbench(filename):
     return [r["question"] for r in rows if r.get("question")]
 
 
+# ---- iOS 程式碼：iOSVuln-review / iOSVuln-secure 用（本檔另加，deep10 沒有）----
+# 資料是 Hugging Face 的 Arno-MHL/ios-security-vulnerabilities-swift-objc（MIT 授權），27 筆 iOS 程式碼
+# （Objective-C 7、Swift 20），每筆有 vulnerable_code（有漏洞）和 secure_code（修好的）兩份。
+# 原始檔不是使用者請求，ios_vuln() 把每份程式碼包成一題 code review 請求。下載一次就好：
+#   python -c "from huggingface_hub import snapshot_download; snapshot_download('Arno-MHL/ios-security-vulnerabilities-swift-objc', repo_type='dataset', local_dir='$HOME/code_benchmarks/iOS-Vuln')"
+IOS_LANG = {"objective-c": ("Objective-C", "objc"), "swift": ("Swift", "swift")}
+IOS_REVIEW = ("Review this {lang} code from our iOS app for security issues and suggest fixes."
+              "\n\n```{fence}\n{code}\n```")
+# 原始程式碼每筆都有「// VULNERABLE: …」「// SECURE: …」這類註解，等於把答案寫在題目裡，兩份都拿掉。
+# 只刪整行的註解：實測 182 處全都獨佔一行，所以不會切到同一行的程式碼或字串裡的 https://。
+IOS_HINT = re.compile(r"^[ \t]*//[^\n]*\b(?:VULNERABLE|DANGEROUS|INSECURE|SECURE|FIX|FIXED)\b[^\n]*\n?", re.M)
+
+
+def ios_vuln(col):
+    """col 是 "vulnerable_code" 或 "secure_code"。train、test 兩個 split 都用（deep20 不訓練）。
+
+    兩個資料集是同一批 27 筆、同樣的順序和請求文字，一題對一題，差別只在附的程式碼。
+    """
+    rows = []
+    for split in ("train", "test"):
+        rows += pq.read_table(f"{CODE}/iOS-Vuln/data/{split}-00000-of-00001.parquet").to_pylist()
+    out = []
+    for r in rows:
+        lang, fence = IOS_LANG[r["language"]]
+        out.append(IOS_REVIEW.format(lang=lang, fence=fence, code=IOS_HINT.sub("", r[col]).strip()))
+    return out
+
+
 # ---- model_route 的標準答案：來自四個 *_routing.py 實際跑過的作答結果 ----
 # 這組配對決定 model_route 標準答案的意義：「能答對的最便宜 model」是相對於這兩個 model 而言。
 # deep1_router.py / deep9.py 實際部署的是 qwen3.8-27b / qwen3.8-flash，但 DashScope 免費額度會把
@@ -596,10 +625,10 @@ class DS:
     expect_route: str | None = None
     """這個資料集**應該**選哪個（"fast" / "powerful"）——沒有實測資料時才用的推定標籤。
 
-    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 51 個資料集剛好切成兩半，
+    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 53 個資料集剛好切成兩半，
     報表的兩節也不重疊：
         route_gold   有實測的 4 個（fast-powerful 類）→ deep10 的「之二」、deep11 的 [10]
-        expect_route 沒有實測的 47 個                 → deep10 的「之一」、deep11 的 [9]
+        expect_route 沒有實測的 49 個                 → deep10 的「之一」、deep11 的 [9]
     fast-powerful 那四個不設 expect_route：手上有真實測量就不需要猜，而且兩者會打架
     （GPQA 照 criteria 推定是 powerful，實測卻有 81% 的題目 fast 就答對了）。
 
@@ -609,7 +638,7 @@ class DS:
          safety / jailbreak / injection / cyber 全部推定 fast（短的單一請求）。
       b) 使用者指定的政策，不是 criteria 的字面解讀：
          * skill 類（skill-queries）一律 powerful：產出完整交付物。
-         * coding 類全部 12 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
+         * coding 類全部 14 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
            SecurityEval / CyberSecEval instruct,autocomplete 這些「單一小函式」的題目——
            照 criteria 字面它們算 fast，但政策上程式正確性值得一律送大 model。
 
@@ -704,6 +733,12 @@ DATASETS = [
     # 來源和題數分配見 repo 的 MATLAB-examples/README.md。要先把那個資料夾複製到 ~/code_benchmarks/ 才讀得到。
     # --cn 要另外準備 ~/code_benchmarks_cn/MATLAB-examples/prompts.jsonl（題數、順序和英文版一樣），沒有就會 [skip]。
     DS("MATLAB-examples", "coding", lambda: jsonl_col(f"{CODE}/MATLAB-examples/prompts.jsonl", "prompt"), False, True, expect_route="powerful"),
+    # iOSVuln-review / iOSVuln-secure 也是本檔另加的（deep10 沒有）：Objective-C / Swift 的 code review 請求，
+    # 程式碼取自 Arno-MHL/ios-security-vulnerabilities-swift-objc（下載方式見 ios_vuln() 上面）。
+    # review 附有漏洞的版本、secure 附修好的版本，同一批 27 筆一題對一題。各 27 題，比預設 -n 80 少，不會抽樣。
+    # 標籤和其他 coding 資料集相同。--cn 沒有中文版（~/code_benchmarks_cn/iOS-Vuln/），會 [skip]。
+    DS("iOSVuln-review", "coding", lambda: ios_vuln("vulnerable_code"), False, True, expect_route="powerful"),
+    DS("iOSVuln-secure", "coding", lambda: ios_vuln("secure_code"), False, True, expect_route="powerful"),
     # ---- skill：agent 技能的正常請求，無害 ----
     DS("skill-queries", "skill", lambda: [json.loads(l)["user_query"] for l in open(SKILL)], False, False, expect_route="powerful"),
     # ---- fast-powerful：有 model_route 標準答案的 benchmark，都是無害的學科題 ----
@@ -1021,7 +1056,7 @@ def cmd_run(args):
         try:
             res, n_new = run_dataset(d, args, classifier)
         except Exception as e:  # noqa: BLE001
-            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 50 個跟著停
+            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 52 個跟著停
             print(f"[skip] {d.name}: {type(e).__name__}: {e}")
             continue
         if res is None:
