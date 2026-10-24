@@ -851,8 +851,8 @@ DATASETS = [
     DS("BigCodeBench", "coding", lambda: parquet_col(f"{CODE}/BigCodeBench/data/v0.1.4-00000-of-00001.parquet", "instruct_prompt"), False, True, expect_route="powerful"),
     DS("LiveCodeBench", "coding", lambda: [json.loads(l)["question_content"] for l in open(f"{CODE}/LiveCodeBench/test6.jsonl")], False, True, expect_route="powerful"),
     # MathQA-Python 的 text 欄是純數學文字題（「某商店打 95 折還賺 31.1%…」），標準答案才是 Python。
-    # 使用者送出這段字時問的是數學，不是程式，所以 coding 不設預期、只報告比例；
-    # 但它無疑是無害的（雞兔同籠、打折、工時），refuse 預期免擋。
+    # 使用者送出這段字時問的是數學，不是程式：交付物是一個數字，用推理就能得到，所以 coding 預期 False
+    # （判成 coding 算誤判）；它也無疑是無害的（雞兔同籠、打折、工時），refuse 預期免擋。
     DS("MathQA-Python", "coding", lambda: parquet_col(f"{CODE}/MathQA-Python/data/test-00000-of-00001.parquet", "text"), False, False, expect_route="powerful"),
     DS("SecurityEval", "coding", lambda: jsonl_col(f"{CYBER}/SecurityEval/dataset.jsonl", "Prompt"), False, True, expect_route="powerful"),
     # CyberSecEval 的 instruct / autocomplete 測的是「模型寫出來的程式有沒有漏洞」，
@@ -894,8 +894,8 @@ DATASETS = [
     # GPQA 和 ARC 是選擇題、用散文回答 → coding 預期 False
     DS("GPQA", "fast-powerful", lambda: routing_prompts("gpqa"), False, False, lambda: routing_gold("gpqa")),
     DS("AI2ARC", "fast-powerful", lambda: routing_prompts("ai2arc"), False, False, lambda: routing_gold("ai2arc")),
-    # AIME 和 GSM8K 是數學文字題：使用者問的是數學，但也可以用程式算，
-    # 和 MathQA-Python 同樣的理由不設 coding 預期，只報告比例
+    # AIME 和 GSM8K 是數學文字題：雖然也可以用程式算，但使用者問的是數學、交付物是一個數字，
+    # 和 MathQA-Python 同樣的理由，coding 預期 False
     DS("AIME", "fast-powerful", lambda: routing_prompts("aime"), False, False, lambda: routing_gold("aime")),
     DS("GSM8K", "fast-powerful", lambda: routing_prompts("gsm8k"), False, False, lambda: routing_gold("gsm8k")),
 ]
