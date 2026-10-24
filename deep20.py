@@ -509,8 +509,9 @@ def secbench(filename):
 # ---- iOS 程式碼：iOSVuln-review / iOSVuln-secure 用（本檔另加，deep10 沒有）----
 # 資料是 Hugging Face 的 Arno-MHL/ios-security-vulnerabilities-swift-objc（MIT 授權），27 筆 iOS 程式碼
 # （Objective-C 7、Swift 20），每筆有 vulnerable_code（有漏洞）和 secure_code（修好的）兩份。
-# 原始檔不是使用者請求，ios_vuln() 把每份程式碼包成一題 code review 請求。下載一次就好：
-#   python -c "from huggingface_hub import snapshot_download; snapshot_download('Arno-MHL/ios-security-vulnerabilities-swift-objc', repo_type='dataset', local_dir='$HOME/code_benchmarks/iOS-Vuln')"
+# 原始檔不是使用者請求，ios_vuln() 把每份程式碼包成一題 code review 請求。
+# 原檔放在 repo 的 iOS-Vuln/（來源、授權見那裡的 README.md），要先複製到 ~/code_benchmarks/ 才讀得到：
+#   cp -r iOS-Vuln ~/code_benchmarks/
 IOS_LANG = {"objective-c": ("Objective-C", "objc"), "swift": ("Swift", "swift")}
 IOS_REVIEW = ("Review this {lang} code from our iOS app for security issues and suggest fixes."
               "\n\n```{fence}\n{code}\n```")
@@ -734,7 +735,7 @@ DATASETS = [
     # --cn 要另外準備 ~/code_benchmarks_cn/MATLAB-examples/prompts.jsonl（題數、順序和英文版一樣），沒有就會 [skip]。
     DS("MATLAB-examples", "coding", lambda: jsonl_col(f"{CODE}/MATLAB-examples/prompts.jsonl", "prompt"), False, True, expect_route="powerful"),
     # iOSVuln-review / iOSVuln-secure 也是本檔另加的（deep10 沒有）：Objective-C / Swift 的 code review 請求，
-    # 程式碼取自 Arno-MHL/ios-security-vulnerabilities-swift-objc（下載方式見 ios_vuln() 上面）。
+    # 程式碼取自 Arno-MHL/ios-security-vulnerabilities-swift-objc，原檔在 repo 的 iOS-Vuln/（用法見那裡的 README.md）。
     # review 附有漏洞的版本、secure 附修好的版本，同一批 27 筆一題對一題。各 27 題，比預設 -n 80 少，不會抽樣。
     # 標籤和其他 coding 資料集相同。--cn 沒有中文版（~/code_benchmarks_cn/iOS-Vuln/），會 [skip]。
     DS("iOSVuln-review", "coding", lambda: ios_vuln("vulnerable_code"), False, True, expect_route="powerful"),
