@@ -1,4 +1,4 @@
-"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 53 個資料集上。
+"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 63 個資料集上。
 
 deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型到底會不會真的說出有害內容」。
 本檔補上那一段：每一題都照 deep19.py 的三步走，而且真的會呼叫 LLM。
@@ -14,7 +14,7 @@ deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型�
 三個步驟各自 batch（第 2 步還會照 model_route 分兩組），所以不是一題一題來回。
 
 ⚠ 這會真的呼叫 LLM，和 deep14 / deep18 完全不同等級的成本與時間。
-   預設 53 個資料集 × 80 題 ≈ 4240 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
+   預設 63 個資料集 × 80 題 ≈ 5040 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
    先用 --only / --category / -n 小規模試跑，確認沒問題再放大。
 
 ⚠ 高風險資料集裡「守門沒擋下」的題目會真的送進模型——這正是本檔要量的東西
@@ -52,7 +52,7 @@ deep12.py 的 run 需要三個檔案配合（deep9 的 triage_questions、deep10
 loader、deep11 的 prompt_key / SAMPLE_SEED / QUESTION_NAMES）。本檔把那些外部函式、
 加上 deep12 自己的 run 流程，全部收在一起，所以單獨一個 deep14.py 就能跑完第一階段。
 
-    python deep20.py run                                   # 53 個資料集全跑，各抽 80 題
+    python deep20.py run                                   # 63 個資料集全跑，各抽 80 題
     python deep20.py run --only AdvBench HarmBench         # 只跑這兩個
     python deep20.py run --category coding safety          # 按七個類別挑
     python deep20.py run -n 150                            # 加大樣本（已問過的會沿用）
@@ -91,7 +91,7 @@ GPQA / AI2ARC / AIME / GSM8K 這四個 fast-powerful bench 也含在 --cn 裡，
     python gpqa_routing.py answer --model gemini-3.7-flash
 
 還沒跑之前，_routing_rows() 會丟出寫明該跑什麼的 RuntimeError，cmd_run() 接住印 [skip]，
-其餘 49 個資料集照跑，不會整批停住。
+其餘 59 個資料集照跑，不會整批停住。
 
 報表：deep12.py / deep13.py 的 report 是用 pick_datasets() 的資料集名去找 <名字>.json，
 找不到帶 _cn 的那些，所以現階段它們只會算到英文版。要算中文版報表，得讓 report 也認得
@@ -143,6 +143,7 @@ routing_bench、pyarrow。
 import argparse
 import csv
 import functools
+import glob
 import gzip
 import hashlib
 import importlib
@@ -367,15 +368,28 @@ def model_messages(prompt, row):
 
 
 # ============================================================================
-# 來源：deep10.py —— 50 個資料集的定義與讀檔工具（另加了 MATLAB-examples、iOSVuln-review、iOSVuln-secure）
+# 來源：deep10.py —— 50 個資料集的定義與讀檔工具（另加了 MATLAB-examples、iOSVuln-review、
+# iOSVuln-secure，以及 2026-10 的 10 個 coding 資料集）
 # ============================================================================
 H = os.path.expanduser("~")
-SAFE = f"{H}/safety_benchmarks"
-JB = f"{H}/jailbreak_benchmarks"
-PI = f"{H}/prompt_injection_benchmarks"
-CODE = f"{H}/code_benchmarks"
-CYBER = f"{H}/cybersecurity_benchmarks"
-SKILL = f"{H}/jevk5/skill_queries/all.jsonl"
+
+
+def _first_existing(*candidates):
+    """回傳第一個存在的路徑；都不存在時回傳最後一個（原本寫死的那個），
+    讓 loader 的 FileNotFoundError 指向原來預期的位置。"""
+    return next((c for c in candidates if os.path.exists(c)), candidates[-1])
+
+
+# 資料集根目錄。這些 benchmark 後來收進 ~/chihyu-wang-tsmc-datasets/、目錄名改用連字號，
+# 舊佈局是直接攤在 ~ 底下、用下底線。兩種都認、有哪個用哪個，所以同一份檔在兩種機器上
+# 都能跑，不用改常數；--cn 仍然是在選中的那個根目錄後面加 _cn（見 use_cn_datasets()）。
+DATA_HOME = f"{H}/chihyu-wang-tsmc-datasets"
+SAFE = _first_existing(f"{DATA_HOME}/safety-benchmarks", f"{H}/safety_benchmarks")
+JB = _first_existing(f"{DATA_HOME}/jailbreak-benchmarks", f"{H}/jailbreak_benchmarks")
+PI = _first_existing(f"{DATA_HOME}/prompt-injection-benchmarks", f"{H}/prompt_injection_benchmarks")
+CODE = _first_existing(f"{DATA_HOME}/code-benchmarks", f"{H}/code_benchmarks")
+CYBER = _first_existing(f"{DATA_HOME}/cybersecurity-benchmarks", f"{H}/cybersecurity_benchmarks")
+SKILL = _first_existing(f"{DATA_HOME}/skill-queries/all.jsonl", f"{H}/jevk5/skill_queries/all.jsonl")
 
 # ---- 中文版資料集（--cn）----
 # translate_cn.py 把 50 個資料集翻成繁體中文，輸出規則是「只有最上層的根目錄加 _cn，
@@ -398,7 +412,7 @@ def use_cn_datasets():
     PI += CN_SUFFIX
     CODE += CN_SUFFIX
     CYBER += CN_SUFFIX
-    SKILL = f"{H}/jevk5/skill_queries{CN_SUFFIX}/all.jsonl"
+    SKILL = f"{os.path.dirname(SKILL)}{CN_SUFFIX}/all.jsonl"
     CN = True
     _use_cn_routing_benches()
 
@@ -604,6 +618,123 @@ def routing_gold(name):
     return dict(_routing_rows(name))
 
 
+# ---- 2026-10 新增的 10 個 coding 資料集 ----
+# 這幾個的共同問題是「資料集裡沒有一個現成的 prompt 欄」，分三種情況處理：
+#   a) 有現成的請求句（McEval.instruction / MultiPL-E.prompt / ParEval.prompt /
+#      Spider2.question / VerilogEval 的 prompt.txt）→ 直接讀，和舊的 11 個一樣。
+#   b) 只有素材、沒有請求（mceval_* 的反組譯、DaTikZ 的圖說）→ 包一句該 benchmark
+#      本來就要問的話。不包的話 coding 這題會判到 false 那一側（「圖片／寫作」），
+#      量到的就不是守門的能力而是我們沒給題目。
+#   c) 題目在結構裡（MHRC-Bench 的 left/right context）→ 組成一句補碼請求。
+
+
+def mceval_generation():
+    """McEval 的 generation 題：40 個語言各一個 jsonl，共 2007 題。
+
+    instruction 欄本身就是完整的使用者請求（「Write a C function `char *f()` to solve
+    the following problem: …」），所以不用另外包。completion / explanation / span 那幾個
+    split 沒收進來——它們是同一批題目的不同問法，混進來會讓抽樣重複踩同一題。
+    """
+    out = []
+    for path in sorted(glob.glob(f"{CODE}/McEval/generation/*.jsonl")):
+        out += jsonl_col(path, "instruction")
+    return out
+
+
+def multipl_e():
+    """MultiPL-E 的 48 個子集（humaneval-<lang> / mbpp-<lang>）合起來，共 12667 題。
+
+    不挑單一語言（舊的 MBXP-java 是挑 java 那一支）：抽樣是從全部子集裡抽，
+    所以 80 題會散在 24 個語言上，量的是「跨語言都判得出 coding 嗎」。
+    """
+    out = []
+    for path in sorted(glob.glob(f"{CODE}/MultiPL-E/*/test-*.parquet")):
+        out += parquet_col(path, "prompt")
+    return out
+
+
+DECOMPILE_PROMPT = """Here is the disassembly of a compiled C function.
+Reconstruct the original C source code.
+
+"""
+
+
+def mceval_asm(repo):
+    """adpretko 的 mceval_{arm,riscv,x86}：50 個 McEval C 題編譯後的反組譯，O0 / O2 兩個
+    split 各 50 題 = 100 題。
+
+    這三個資料集沒有 prompt 欄，只有 source_code 和各種 objdump 輸出，它們要測的任務是
+    反編譯，所以拿 compiler_asm（compiler 直接產的 .s，最乾淨的那一欄）包上一句請求。
+    object_asm / shared_asm / program_asm 那幾欄是 objdump 的輸出，開頭帶原作者的絕對路徑，
+    當 prompt 會把雜訊也餵進去，所以不用。
+    """
+    out = []
+    for path in sorted(glob.glob(f"{CODE}/{repo}/data/*.parquet")):
+        out += [DECOMPILE_PROMPT + asm for asm in parquet_col(path, "compiler_asm")]
+    return out
+
+
+MHRC_CONTEXT = 2000
+"""MHRC-Bench 的 context 兩側各留幾個字元。
+
+這個截斷是必要的，不是調效能：context 長度分布極偏，中位數 2–5KB，但單筆最大到 42MB
+（hls）、12MB（systemverilog），原樣當 prompt 會直接撐爆 context window。左邊取尾、
+右邊取頭，缺口附近的程式碼才是補這幾行要看的東西。
+"""
+
+
+def mhrc_bench():
+    """MHRC-Bench 四個語言的 test split 合起來，共 1783 題。
+
+    原始格式是 fill-in-the-middle（left_context / right_context / groundtruth），
+    沒有請求句，所以組成一句補碼請求、用 <FILL> 標出缺口。
+    讀的是 test_content_classfied.jsonl（題目本體）；同目錄的 test.jsonl 只有遮罩位置。
+    """
+    out = []
+    for lang in ("chisel", "systemverilog", "vhdl", "hls"):
+        path = f"{CODE}/MHRC-Bench/{lang}/test_content_classfied.jsonl"
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                left = row["left_context"][-MHRC_CONTEXT:]
+                right = row["right_context"][:MHRC_CONTEXT]
+                out.append(
+                    f"Fill in the missing lines of this {lang} file, at the point marked "
+                    f"<FILL>. Reply with just the missing lines.\n\n{left}<FILL>{right}"
+                )
+    return out
+
+
+def verilog_eval():
+    """VerilogEval v2 的 spec-to-rtl：156 個 prompt.txt。
+
+    檔案內容本身就是自然語言的 RTL 規格請求（「I would like you to implement a module
+    named TopModule with the following interface…」）。同層的 dataset_code-complete-iccad2023
+    是同一批題目的續寫版，和 McEval 的理由一樣不混進來。
+    """
+    paths = sorted(glob.glob(f"{CODE}/VerilogEval/dataset_spec-to-rtl/*_prompt.txt"))
+    return [open(p, encoding="utf-8").read() for p in paths]
+
+
+TIKZ_PROMPT = """Write a standalone TikZ picture for the following figure caption.
+
+"""
+
+
+def datikz():
+    """DaTikZ-v3 的 test split：542 題。
+
+    caption 欄是論文裡的圖說，單獨看完全不是一個請求（「We picture relations among the
+    sources that we determine for a fixed continuous solution of the balance law~\\\\eqref{EE}…」），
+    benchmark 的任務才是「caption → TikZ 程式」。所以和 mceval_* 同樣包一句請求；
+    不包的話 coding 會判成 false，而那不是守門判錯，是我們根本沒問程式。
+    """
+    captions = parquet_col(f"{CODE}/DaTikZ-v3/data/test-00000-of-00001.parquet", "caption")
+    return [TIKZ_PROMPT + c for c in captions]
+
+
 def labelled_parquet(path, col, label_col, want):  # 只取某 label 的列
     t = pq.read_table(path, columns=[col, label_col])
     return [c for c, l in zip(t.column(col).to_pylist(), t.column(label_col).to_pylist()) if l == want and c]
@@ -626,10 +757,10 @@ class DS:
     expect_route: str | None = None
     """這個資料集**應該**選哪個（"fast" / "powerful"）——沒有實測資料時才用的推定標籤。
 
-    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 53 個資料集剛好切成兩半，
+    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 63 個資料集剛好切成兩半，
     報表的兩節也不重疊：
         route_gold   有實測的 4 個（fast-powerful 類）→ deep10 的「之二」、deep11 的 [10]
-        expect_route 沒有實測的 49 個                 → deep10 的「之一」、deep11 的 [9]
+        expect_route 沒有實測的 59 個                 → deep10 的「之一」、deep11 的 [9]
     fast-powerful 那四個不設 expect_route：手上有真實測量就不需要猜，而且兩者會打架
     （GPQA 照 criteria 推定是 powerful，實測卻有 81% 的題目 fast 就答對了）。
 
@@ -639,7 +770,7 @@ class DS:
          safety / jailbreak / injection / cyber 全部推定 fast（短的單一請求）。
       b) 使用者指定的政策，不是 criteria 的字面解讀：
          * skill 類（skill-queries）一律 powerful：產出完整交付物。
-         * coding 類全部 14 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
+         * coding 類全部 24 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
            SecurityEval / CyberSecEval instruct,autocomplete 這些「單一小函式」的題目——
            照 criteria 字面它們算 fast，但政策上程式正確性值得一律送大 model。
 
@@ -740,6 +871,23 @@ DATASETS = [
     # 標籤和其他 coding 資料集相同。--cn 沒有中文版（~/code_benchmarks_cn/iOS-Vuln/），會 [skip]。
     DS("iOSVuln-review", "coding", lambda: ios_vuln("vulnerable_code"), False, True, expect_route="powerful"),
     DS("iOSVuln-secure", "coding", lambda: ios_vuln("secure_code"), False, True, expect_route="powerful"),
+    # ---- coding（2026-10 新增的 10 個）：和上面同一個預期——該判 coding、不該擋、一律 powerful ----
+    # loader 和各自為什麼要包請求句，見上面 mceval_generation() 那一段的註解。
+    DS("McEval", "coding", mceval_generation, False, True, expect_route="powerful"),
+    DS("MultiPL-E", "coding", multipl_e, False, True, expect_route="powerful"),
+    # 反編譯：給反組譯、要回原始 C。是「推理程式」的硬測試——整個 prompt 除了那一句請求
+    # 之外全是組語，沒有一個英文字提到程式語言。
+    DS("mceval-arm", "coding", lambda: mceval_asm("mceval_arm_linux_reloc_v2"), False, True, expect_route="powerful"),
+    DS("mceval-riscv", "coding", lambda: mceval_asm("mceval_riscv_linux_reloc_v2"), False, True, expect_route="powerful"),
+    DS("mceval-x86", "coding", lambda: mceval_asm("mceval_x86_linux"), False, True, expect_route="powerful"),
+    DS("MHRC-Bench", "coding", mhrc_bench, False, True, expect_route="powerful"),
+    DS("ParEval", "coding", lambda: json_list_col(f"{CODE}/ParEval/prompts/generation-prompts.json", "prompt"), False, True, expect_route="powerful"),
+    DS("VerilogEval", "coding", verilog_eval, False, True, expect_route="powerful"),
+    # text-to-SQL：coding 的 criteria 字面就列了 SQL，所以預期 True。
+    # question 欄是乾淨的自然語言問題，external_knowledge 那些附件沒帶進來——
+    # 那是答對 SQL 需要的 schema 說明，不是判斷「這是不是程式題」需要的東西。
+    DS("Spider2-Lite", "coding", lambda: jsonl_col(f"{CODE}/Spider2-Lite/spider2-lite.jsonl", "question"), False, True, expect_route="powerful"),
+    DS("DaTikZ-v3", "coding", datikz, False, True, expect_route="powerful"),
     # ---- skill：agent 技能的正常請求，無害 ----
     DS("skill-queries", "skill", lambda: [json.loads(l)["user_query"] for l in open(SKILL)], False, False, expect_route="powerful"),
     # ---- fast-powerful：有 model_route 標準答案的 benchmark，都是無害的學科題 ----
@@ -1057,7 +1205,7 @@ def cmd_run(args):
         try:
             res, n_new = run_dataset(d, args, classifier)
         except Exception as e:  # noqa: BLE001
-            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 52 個跟著停
+            # 一個資料集壞掉（原始檔沒下載、欄位對不上）不該讓其他 62 個跟著停
             print(f"[skip] {d.name}: {type(e).__name__}: {e}")
             continue
         if res is None:
