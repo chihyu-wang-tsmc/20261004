@@ -7,6 +7,10 @@ deep20_coding_report.py 和另外兩份報表一樣只讀 result 檔（它 docst
 coding 的 P(是) 是 deep20_h2o.py run 的時候、第一道那次呼叫一起問出來的，報表只是讀出來
 算 Precision / Recall / AUROC。
 
+（[C6] 逐語言是唯一的例外：它要的「這題是什麼程式語言」不在 result 裡，由
+deep20_coding_langs.py 回頭讀原始資料集。那個對照表和 classifier 無關，h2o 和 jevk5
+兩邊查到的語言一樣，所以這支照樣一行都不用改；原始資料集不在就只少掉 [C6]。）
+
 要換的只有兩個目錄：
 
     g.RESULT_DIR   deep20_results/          → deep20_h2o_results/        （--results 的預設值）

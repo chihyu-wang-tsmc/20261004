@@ -21,9 +21,11 @@ deep20_guard_report_h2o_jevk5/dataset_guardrail*.xlsx
 # LiveCodeBench 的題目檔，129MB，超過 GitHub 單檔 100MB 上限
 test6.jsonl
 
-# deep20_coding_report.py 的 Excel，每次跑都會重生
+# deep20_coding_report.py 的 Excel 和 [C8] 的門檻曲線，每次跑都會重生
 deep20_coding_report/tables*.xlsx
+deep20_coding_report/roc*.png
 deep20_coding_report_h2o/tables*.xlsx
+deep20_coding_report_h2o/roc*.png
 
 # hierarchical_*.py 的回答快取，每次跑都能重生（CPC zip、Shopify categories.txt、MeSH desc2026.zip 有入版控，不用再下載）
 hierarchical_cpc/json_cache.*

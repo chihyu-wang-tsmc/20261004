@@ -46,7 +46,7 @@ meta.classifier / meta.thinking_level 記著每份 result 是哪個設定問的�
 
 Gemini 一次請求只回答一個問題（見 classifier_gemini.py），所以一個 prompt 是
 第一道 5 次 + 第三道 3 次 = 最多 8 次 Gemini 呼叫，再加一次 qwen。
-預設 63 個資料集 × 80 題 ≈ 5040 題，大約 3～4 萬次 Gemini 呼叫。先用 --only / --category / -n 小規模試。
+預設 62 個資料集 × 80 題 ≈ 4960 題，大約 3～4 萬次 Gemini 呼叫。先用 --only / --category / -n 小規模試。
 429（超過配額）會自動退避重試，不會整批失敗，只是會變慢。
 
 ---- Gemini 不肯讀的題目 ----

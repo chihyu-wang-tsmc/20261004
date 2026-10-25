@@ -12,13 +12,16 @@ coding 的標準答案是資料集層級的（deep20.py DATASETS 的 expect_codi
     True    該判 coding    寫程式、修程式、競賽題、要產出程式碼的資安題（HumanEval、APPS、
                            CyberSecEval-instruct、RMCBench-malcode、mitre_frr-benign…）
     False   不該判 coding  一般問答、選擇題、文件／簡報類任務、有害請求、數學文字題（AdvBench、
-                           GPQA、CyberMetric、skill-queries、MathQA-Python、AIME、GSM8K…）
+                           GPQA、CyberMetric、skill-queries、AIME、GSM8K…）
     None    只報告         只列出 coding 率，不算進對錯。deep20.py 目前每個資料集都標了 True／False，
                            只有沒存 coding_gold 的舊 result 會落在這裡
 
-數學文字題（MathQA-Python、AIME、GSM8K）是 False：交付物是一個數字，用推理就能得到，
-和 APPS／CodeContests 那種交付物本身就是程式的不同（MathQA-Python 的 gold 答案是 Python，
-但使用者送出的那段字問的是數學）。所以它們被判成 coding 會算進 FP。
+數學文字題（AIME、GSM8K）是 False：交付物是一個數字，用推理就能得到，和 APPS／CodeContests
+那種交付物本身就是程式的不同。所以它們被判成 coding 會算進 FP。
+
+注意 coding 類現在一個負類都沒有——23 個資料集的 coding_gold 全是 True。
+不該判 coding 的題目都在其他類別（safety / cyber / fast-powerful…），
+所以 [C7] 的 FPR 整欄都是「—」，[C8] 也必須把 coding 以外的類別一起讀進來才畫得出曲線。
 
 正類 = 該判 coding。「偵測率」就是 Recall：該判 coding 的題目裡，P ≥ 門檻的比例。
 
@@ -31,6 +34,15 @@ coding 的標準答案是資料集層級的（deep20.py DATASETS 的 expect_codi
     [C3] 逐類別         七大類各自的 coding 率與判對率
     [C4] 逐資料集       每個資料集的 coding 率、判對率（含 95% 信賴區間）、平均 P
     [C5] 判錯的例子     判對率不到 80% 的資料集，各列 3 題判錯的 prompt（全部判錯的題目在 Excel）
+    [C6] 逐語言         coding 類資料集 × 程式語言的題數與分布（占比、coding 率、判對率、平均 P），
+                        加上語言彙總。語言取自原始資料集（見 deep20_coding_langs.py），不是從
+                        prompt 文字猜的；原始資料集不在就只跳過 [C6] 和 [C7]
+    [C7] 逐語言的指標   同樣的分法，改看對錯：混淆矩陣（TP／FN／FP／TN）與 Precision / Recall /
+                        FPR / F1 / Accuracy。注意 coding 類一個負類都沒有，所以每一列的
+                        FP = TN = 0、FPR 算不出來（那一節開頭會講）
+    [C8] 門檻 trade-off X = 誤判率 FPR、Y = 偵測率 Recall 的曲線，點上標門檻 τ，★ 是目前的 0.5。
+                        用的是全部題目（負類幾乎都在 coding 類以外），和 [C2] 同一批數字、
+                        換成看得出取捨的形狀；另存一張 PNG（--no-plot 不畫）
 
 ---- 用法 ----
 
@@ -45,6 +57,7 @@ coding 的標準答案是資料集層級的（deep20.py DATASETS 的 expect_codi
 
     deep20_coding_report/tables.xlsx   每一節一個工作表，另有「判錯的題目」與「逐題資料」
                                        （--mock 時是 tables_mock.xlsx）
+    deep20_coding_report/roc.png       [C8] 的門檻曲線（--mock / --dark 時檔名加 _mock / _dark）
 
 讀 result、算指標、印表格都沿用 deep20_guard_report.py 的函式，不 import deep20。
 """
@@ -255,6 +268,268 @@ def report_examples(rep, by_ds, thr):
         for r in sorted(wrong, key=lambda r: (r["dataset"], -abs(r["coding"] - thr)))]))
 
 
+def lang_rows(rows):
+    """幫每一題補上 lang 欄（只有 coding 類會查），回傳 (coding 類的題目, 讀不到原始檔的資料集)。
+
+    語言是從原始資料集取的，不是從 prompt 猜的——細節和為什麼在 deep20_coding_langs.py。
+    那支會 import deep20（本檔仍然不會），所以在這裡才 import：原始資料集不在、或 deep20
+    import 失敗，就只是沒有 [C6]，前面五節照印。
+    """
+    sub = [r for r in rows if r["category"] == "coding"]
+    if not sub or all(r.get("lang") for r in sub):
+        return sub, {}
+    try:
+        import deep20_coding_langs as L
+    except Exception as e:  # noqa: BLE001 —— 少一節報表而已，不該讓整份報表掛掉
+        return sub, {"（import）": f"{type(e).__name__}: {e}"}
+    for r in sub:
+        if not r.get("lang"):  # --mock 的示意資料自己帶了 lang
+            r["lang"] = L.lang_of(r["dataset"], r.get("prompt", ""))
+    return sub, L.failures()
+
+
+def lang_acc(sub, thr):
+    """(判對的題數, 算得了對錯的題數)。逐題看自己資料集的 coding_gold，所以混著不同預期也算得對。"""
+    scored = [r for r in sub if r["coding_gold"] is not None]
+    if not scored:
+        return None, 0
+    return sum((r["coding"] >= thr) == r["coding_gold"] for r in scored), len(scored)
+
+
+def report_langs(rep, rows, thr):
+    """[C6] coding 類資料集 × 程式語言的題數。"""
+    rep.section("[C6] 逐語言（只看 coding 類的資料集；語言取自原始資料集，不是從 prompt 猜的）")
+    sub, failed = lang_rows(rows)
+    if not sub:
+        rep.note("這次沒有 coding 類的資料集（看 --category / --only）")
+        return
+    rep.note("語言 = 這一題實際在處理的程式語言（prompt 裡那段程式碼的語言）。\n"
+             "mceval-* 是反編譯題，prompt 整篇是組語、要交付的才是 C，所以記成組語；\n"
+             "「不限」是競賽題敘述（APPS / CodeContests），整篇沒指定語言；\n"
+             "「未知」是原始資料集讀不到、或 deep20.py 的 loader 改過而對不上"
+             "（python deep20_coding_langs.py check 會指出是哪個）。")
+    for name, why in failed.items():
+        rep.note(f"[warn] {name} 的語言讀不到（{why}），這些題目算「未知」")
+
+    by_ds = defaultdict(list)
+    for r in sub:
+        by_ds[r["dataset"]].append(r)
+    gold_order = {True: 0, False: 1, None: 2}
+
+    body = []
+    for d in sorted(by_ds, key=lambda d: (gold_order[by_ds[d][0]["coding_gold"]], d)):
+        ds_rows = by_ds[d]
+        by_lang = defaultdict(list)
+        for r in ds_rows:
+            by_lang[r["lang"]].append(r)
+        # 題數多的語言排前面，同題數照語言名排，整個資料集只有一個語言時就只有一列
+        for i, lang in enumerate(sorted(by_lang, key=lambda x: (-len(by_lang[x]), x))):
+            grp = by_lang[lang]
+            good, n_scored = lang_acc(grp, thr)
+            body.append([d if i == 0 else "", lang, len(grp), P(len(grp) / len(ds_rows)),
+                         P(sum(r["coding"] >= thr for r in grp) / len(grp)),
+                         P(good / n_scored) if n_scored else Cell(None, "—"),
+                         F(sum(r["coding"] for r in grp) / len(grp))])
+    rep.table("C6_逐語言", f"逐資料集 × 語言（共 {len(by_ds)} 個資料集、{len(sub)} 題）",
+              ["資料集", "語言", "題數", "占該資料集", "coding 率", "判對率", "平均 P"],
+              body, ["<", "<", ">", ">", ">", ">", ">"])
+
+    by_lang = defaultdict(list)
+    for r in sub:
+        by_lang[r["lang"]].append(r)
+    body = []
+    for lang in sorted(by_lang, key=lambda x: (-len(by_lang[x]), x)):
+        grp = by_lang[lang]
+        good, n_scored = lang_acc(grp, thr)
+        body.append([lang, len(grp), len({r["dataset"] for r in grp}),
+                     P(len(grp) / len(sub)),
+                     P(sum(r["coding"] >= thr for r in grp) / len(grp)),
+                     P(good / n_scored) if n_scored else Cell(None, "—"),
+                     F(sum(r["coding"] for r in grp) / len(grp))])
+    rep.table("C6_逐語言", f"語言彙總（{len(by_lang)} 種）",
+              ["語言", "題數", "出現在幾個資料集", "占 coding 類", "coding 率", "判對率", "平均 P"],
+              body, ["<", ">", ">", ">", ">", ">", ">"])
+
+
+def metric_cells(sub, thr):
+    """一組題目的 TP / FN / FP / TN 加五個指標，排成表格的一列（不含前面的名字欄）。
+
+    只算有標準答案的題目。分母是 0 的指標 g.metrics() 回 None，P()／F() 印成「—」，
+    不會變成假的 0 或 1。
+    """
+    graded = [r for r in sub if r["coding_gold"] is not None]
+    if not graded:
+        return [len(sub), *([Cell(None, "—")] * 9)]
+    tp, fn, fp, tn = g.confusion_pred([r["coding"] >= thr for r in graded],
+                                      [bool(r["coding_gold"]) for r in graded])
+    m = g.metrics(tp, fn, fp, tn)
+    return [len(graded), tp, fn, fp, tn,
+            F(m["precision"]), P(m["recall"]), P(m["fpr"]), F(m["f1"]), P(m["accuracy"])]
+
+
+METRIC_HEAD = ["題數", "TP", "FN", "FP", "TN",
+               "Precision", "Recall（偵測率）", "FPR", "F1", "Accuracy（判對率）"]
+
+
+def report_lang_metrics(rep, rows, thr):
+    """[C7] 逐語言的混淆矩陣與指標。"""
+    rep.section(f"[C7] 逐語言的混淆矩陣與指標　正類 = 該判 coding；P ≥ {thr} 就判成 coding")
+    sub, _ = lang_rows(rows)
+    sub = [r for r in sub if r["coding_gold"] is not None]
+    if not sub:
+        rep.note("這次沒有帶 coding 標準答案的 coding 類題目（看 --category / --only）")
+        return
+    neg_ds = sorted({r["dataset"] for r in sub if not r["coding_gold"]})
+    rep.note("語言的分法和 [C6] 相同；[C6] 看的是分布（占比、平均 P），這一節看的是對錯。\n"
+             "Accuracy 就是 [C6] 的判對率——一組題目的 (TP + TN) / 題數，兩邊是同一個數字。")
+    if neg_ds:
+        rep.note(f"⚠ coding 類裡標準答案是「不該判」的資料集只有 {len(neg_ds)} 個"
+                 f"（{'、'.join(neg_ds)}）。只出現在那幾個資料集的語言才有負類；\n"
+                 "其餘每一列 FP = TN = 0 是結構決定的，不是模型表現："
+                 "FPR 算不出來（印「—」）、Precision 恆為 1.000、Accuracy 等於 Recall。")
+    else:
+        rep.note("⚠ 這次讀到的 coding 類題目**一個負類都沒有**（coding_gold 全是 True）。\n"
+                 "所以每一列 FP = TN = 0 是結構決定的，不是模型表現："
+                 "FPR 算不出來（印「—」）、Precision 恆為 1.000、Accuracy 等於 Recall。\n"
+                 "這一節能看的只有 Recall（= Accuracy）：哪個語言的 coding 題最容易被漏掉。")
+    rep.note("要看誤判，得看 [C1] 的整體數字、[C3] 的逐類別，或 [C8] 的曲線"
+             "——不該判 coding 的題目都在 safety／cyber／fast-powerful 那幾類。")
+
+    by_ds = defaultdict(list)
+    for r in sub:
+        by_ds[r["dataset"]].append(r)
+    gold_order = {True: 0, False: 1}
+
+    body = []
+    for d in sorted(by_ds, key=lambda d: (gold_order[bool(by_ds[d][0]["coding_gold"])], d)):
+        by_lang = defaultdict(list)
+        for r in by_ds[d]:
+            by_lang[r["lang"]].append(r)
+        for i, lang in enumerate(sorted(by_lang, key=lambda x: (-len(by_lang[x]), x))):
+            body.append([d if i == 0 else "", lang, *metric_cells(by_lang[lang], thr)])
+    rep.table("C7_逐語言指標", f"逐資料集 × 語言（{len(by_ds)} 個資料集、{len(sub)} 題）",
+              ["資料集", "語言", *METRIC_HEAD], body, ["<", "<"] + [">"] * len(METRIC_HEAD))
+
+    by_lang = defaultdict(list)
+    for r in sub:
+        by_lang[r["lang"]].append(r)
+    body = []
+    for lang in sorted(by_lang, key=lambda x: (-len(by_lang[x]), x)):
+        grp = by_lang[lang]
+        body.append([lang, len({r["dataset"] for r in grp}), *metric_cells(grp, thr)])
+    rep.table("C7_逐語言指標", f"語言彙總（{len(by_lang)} 種）",
+              ["語言", "資料集數", *METRIC_HEAD], body, ["<"] + [">"] * (len(METRIC_HEAD) + 1))
+
+
+# ============================================================================
+# [C8] ROC：門檻從嚴到鬆，偵測率與誤判率怎麼換
+# ============================================================================
+# 兩個軸都是「在同一類題目裡算的比例」，所以不受「這批題目裡該判 coding 的佔幾成」影響，
+# 換一批資料集曲線位置不會亂跳（和 deep20_guard_report.py [G10] 的理由一樣）。
+#   X 誤判率 FPR    不該判 coding 的題目裡，P ≥ τ 被判成 coding 的比例
+#   Y 偵測率 Recall 該判 coding 的題目裡，P ≥ τ 抓到的比例
+# 曲線每個觀測到的分數都是一個點（形狀才準），圓點和數字只標 ROC_MARKS 那幾個門檻。
+# 兩端的 1.0 和 0.0 是曲線的兩個角落，標出來才看得出整條線的範圍：
+#   τ = 1.0  只有 P 剛好是 1.0 的題目算 coding，幾乎什麼都不判 → 左下角
+#   τ = 0.0  每一題都判成 coding → 右上角 (100%, 100%)
+# （[C2] 門檻掃描的 SWEEP 是 0.1–0.9，那兩個極端在表上沒有意義，所以兩邊各用各的）
+ROC_MARKS = tuple(round(0.1 * i, 1) for i in range(11))
+
+
+def roc_curve(scores, gold):
+    """[(FPR, Recall)]，由左下到右上。兩端補上 (0,0) 和 (1,1)，線才接得到角落。"""
+    n_pos, n_neg = sum(gold), len(gold) - sum(gold)
+    if not n_pos or not n_neg:
+        return []
+    pts = [(0.0, 0.0)]
+    for _, tp, fp in sweep_points(scores, gold):
+        pts.append((fp / n_neg, tp / n_pos))
+    pts.append((1.0, 1.0))
+    return pts
+
+
+def report_roc(rep, rows, thr):
+    """[C8] 門檻 trade-off：偵測率 vs 誤判率。"""
+    rep.section(f"[C8] 門檻 trade-off　X = 誤判率 FPR、Y = 偵測率 Recall；目前的門檻是 {thr}")
+    graded = [r for r in rows if r["coding_gold"] is not None]
+    scores = [r["coding"] for r in graded]
+    gold = [bool(r["coding_gold"]) for r in graded]
+    n_pos, n_neg = sum(gold), len(gold) - sum(gold)
+    if not n_pos or not n_neg:
+        rep.note(f"只有一類題目（該判 {n_pos}／不該判 {n_neg}），畫不出曲線")
+        return
+    neg_by_cat = Counter(r["category"] for r in graded if not r["coding_gold"])
+    neg_txt = "、".join(f"{c} {k}" for c, k in neg_by_cat.most_common())
+    rep.note(f"這一節用的是這次讀進來的**所有類別**，共 {len(graded)} 題"
+             f"（該判 coding {n_pos}／不該判 {n_neg}）——不是只有 coding 類，"
+             "但 --only / --category 濾掉的題目一樣不在裡面。\n"
+             "不限 coding 類的原因：X 軸要有「不該判 coding」的題目才算得出來，"
+             "而 coding 類 23 個資料集的 coding_gold 全是 True，一個負類都沒有。\n"
+             f"  這次不該判的 {n_neg} 題分布：{neg_txt}\n"
+             "兩個軸都是在同一類題目裡算的比例，所以不受「該判 coding 的題目佔幾成」影響，"
+             "換一批資料集曲線位置不會亂跳。")
+
+    body = []
+    for t in sorted(set(ROC_MARKS) | {thr}, reverse=True):
+        tp, fn, fp, tn, m = at(scores, gold, t)
+        body.append([f"{t:.2f}", P(m["fpr"]), P(m["recall"]), tp, fn, fp, tn,
+                     F(m["precision"]), F(m["f1"]),
+                     "← 目前" if abs(t - thr) < 1e-9 else ""])
+    rep.table("C8_門檻曲線", "曲線上的幾個門檻（τ 由大到小；越小越容易判成 coding）",
+              ["門檻 τ", "誤判率 FPR（X）", "偵測率 Recall（Y）", "TP", "FN", "FP", "TN",
+               "Precision", "F1", ""],
+              body, ["<"] + [">"] * 8 + ["<"])
+    rep.note(f"AUROC {F(g.auroc(scores, gold))}：曲線下的面積，門檻無關。0.5 是亂猜（圖上的對角線）\n"
+             "τ 調鬆（往小）→ 兩個比例一起上升，點往右上走；調嚴則往左下。要的是「同樣的誤判率下，"
+             "偵測率最高」那條線\n"
+             "整條曲線都是確切值：coding 的 P(是) 每題都存在 result 裡，換門檻只是重算，不用重跑")
+
+
+def fig_roc(rows, path, thr, dark=False):
+    """[C8] 的圖：Recall（Y）vs FPR（X），點上標門檻 τ。畫得出來回傳 True。"""
+    import matplotlib.pyplot as plt
+
+    import deep20_report as d20r  # 調色盤、字型、坐標軸樣式和其他兩份報表的圖一致
+
+    graded = [r for r in rows if r["coding_gold"] is not None]
+    scores = [r["coding"] for r in graded]
+    gold = [bool(r["coding_gold"]) for r in graded]
+    pts = roc_curve(scores, gold)
+    if not pts:
+        return False
+
+    d20r.setup_font()
+    c = d20r.PALETTE["dark" if dark else "light"]
+    fig, ax = plt.subplots(figsize=(7.2, 6.0))
+    d20r.style_axes(ax, c)
+    ax.plot([0, 1], [0, 1], color=c["muted"], lw=1, ls="--", zorder=2,
+            label=d20r.t("亂猜（AUROC 0.5）", "Random (AUROC 0.5)"))
+    ax.plot([x for x, _ in pts], [y for _, y in pts], color=c["router"], lw=2, zorder=3,
+            label=d20r.t(f"coding 偵測（AUROC {g.auroc(scores, gold):.3f}）",
+                         f"Coding detection (AUROC {g.auroc(scores, gold):.3f})"))
+
+    for t in ROC_MARKS:
+        _, _, _, _, m = at(scores, gold, t)
+        ax.plot(m["fpr"], m["recall"], "o", ms=5, color=c["router"], mew=0, zorder=5)
+        ax.annotate(f"{t:.1f}", (m["fpr"], m["recall"]), textcoords="offset points",
+                    xytext=(7, -10), color=c["ink2"], fontsize=8)
+    _, _, _, _, cur = at(scores, gold, thr)
+    ax.plot(cur["fpr"], cur["recall"], "*", ms=15, color=c["mark"], mew=0, zorder=6,
+            label=d20r.t(f"目前的門檻 τ={thr:g}", f"Current threshold τ={thr:g}"))
+
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
+    d20r.pct_axis(ax.xaxis)
+    d20r.pct_axis(ax.yaxis)
+    ax.set_xlabel(d20r.t("誤判率 FPR：不該判 coding 卻判成 coding",
+                         "FPR: non-coding prompts flagged as coding"), color=c["ink2"])
+    ax.set_ylabel(d20r.t("偵測率 Recall：該判 coding 而抓到",
+                         "Recall: coding prompts detected"), color=c["ink2"])
+    ax.legend(loc="lower right", labelcolor=c["ink2"], fontsize=8.5)
+    d20r._save(fig, path, c)
+    return True
+
+
 # ============================================================================
 # 示意資料
 # ============================================================================
@@ -266,8 +541,14 @@ MOCK = [  # 資料集, 類別, 預期, P(coding) 的中心
     ("WildJailbreak-benign", "jailbreak", False, 0.1), ("deepset-PI", "injection", False, 0.08),
     ("CyberMetric", "cyber", False, 0.25), ("SecEval", "cyber", False, 0.3),
     ("skill-queries", "skill", False, 0.15), ("GPQA", "fast-powerful", False, 0.05),
-    ("MathQA-Python", "coding", False, 0.35), ("GSM8K", "fast-powerful", False, 0.2),
+    ("AIME", "fast-powerful", False, 0.35), ("GSM8K", "fast-powerful", False, 0.2),
 ]
+
+
+MOCK_LANGS = {  # [C6] 的示意語言；真跑時是 deep20_coding_langs.py 從原始資料集查的
+    "HumanEval": ("Python",), "APPS": ("不限",), "LiveCodeBench": ("Python",),
+    "CyberSecEval-instruct": ("Python", "C++", "Java"),
+}
 
 
 def mock_rows(seed=20261013):
@@ -275,10 +556,12 @@ def mock_rows(seed=20261013):
     rows = []
     for name, cat, gold, mu in MOCK:
         k = 4
+        langs = MOCK_LANGS.get(name)
         for i in range(80):
             p = rng.betavariate(max(mu, 0.02) * k, max(1 - mu, 0.02) * k)
             rows.append({"key": f"{name}:{i:04d}", "dataset": name, "category": cat, "coding_gold": gold,
-                         "coding": p, "coding_conf": abs(2 * p - 1), "prompt": f"（示意）{name} 第 {i} 題"})
+                         "coding": p, "coding_conf": abs(2 * p - 1), "prompt": f"（示意）{name} 第 {i} 題",
+                         **({"lang": langs[i % len(langs)]} if langs else {})})
     return rows
 
 
@@ -299,15 +582,28 @@ def cmd_report(args):
     report_sweep(rep, rows, args.threshold)
     by_ds = report_groups(rep, rows, args.threshold)
     report_examples(rep, by_ds, args.threshold)
+    report_langs(rep, rows, args.threshold)
+    report_lang_metrics(rep, rows, args.threshold)
+    report_roc(rep, rows, args.threshold)
+    if not args.no_plot:
+        os.makedirs(args.out, exist_ok=True)
+        print("\n畫 [C8] 的門檻曲線")
+        try:
+            name = "roc" + ("_mock" if args.mock else "") + ("_dark" if args.dark else "") + ".png"
+            if not fig_roc(rows, os.path.join(args.out, name), args.threshold, dark=args.dark):
+                print("  [skip] 只有一類題目，畫不出曲線")
+        except ImportError as e:
+            print(f"  [skip] 畫不了圖（{e}）；需要 numpy + matplotlib")
     if not args.no_excel:
         os.makedirs(args.out, exist_ok=True)
         print("\n寫 Excel")
         for r in rows:
             r["coding_pred"] = r["coding"] >= args.threshold
             r["coding_gold_zh"] = GOLD_ZH[r["coding_gold"]]
+            r.setdefault("lang", "")  # 只有 coding 類查得到語言，其他類別留空
         rep.write_excel(os.path.join(args.out, "tables_mock.xlsx" if args.mock else "tables.xlsx"), rows,
-                        keep=("dataset", "category", "coding_gold_zh", "coding", "coding_conf", "coding_pred",
-                              "key", "prompt"))
+                        keep=("dataset", "category", "coding_gold_zh", "lang", "coding", "coding_conf",
+                              "coding_pred", "key", "prompt"))
     print()
 
 
@@ -326,6 +622,8 @@ def main():
     p.add_argument("--threshold", type=float, default=CODING_THRESHOLD,
                    help=f"P(coding) ≥ 它就判成 coding（預設 {CODING_THRESHOLD}，和 deep20.py 一致）")
     p.add_argument("--no-excel", action="store_true", help="只印主控台，不寫 Excel")
+    p.add_argument("--no-plot", action="store_true", help="不畫 [C8] 的門檻曲線")
+    p.add_argument("--dark", action="store_true", help="[C8] 的圖用深色底（檔名加 _dark）")
     p.set_defaults(func=cmd_report)
     args = ap.parse_args()
     args.func(args)

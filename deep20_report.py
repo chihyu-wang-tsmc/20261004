@@ -417,7 +417,7 @@ def mock_conf_by_dataset(seed=20261011):
                   "CyberSecEval-interpreter", "RMCBench-malcode", "mitre_frr-benign",
                   "SecBench-mcq", "SecBench-saq"],
         "coding": ["HumanEval", "MBPP", "MBXP-java", "APPS", "CodeContests", "BigCodeBench",
-                   "LiveCodeBench", "MathQA-Python", "SecurityEval", "CyberSecEval-instruct",
+                   "LiveCodeBench", "SecurityEval", "CyberSecEval-instruct",
                    "CyberSecEval-autocomplete"],
         "skill": ["skill-queries"],
         "fast-powerful": ["GPQA", "AI2ARC", "AIME", "GSM8K"],

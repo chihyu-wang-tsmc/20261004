@@ -1,4 +1,4 @@
-"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 63 個資料集上。
+"""`python deep20.py run` —— 把 deep19.py 的「LLM 前後各一道守門」整條流程，跑在 62 個資料集上。
 
 deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型到底會不會真的說出有害內容」。
 本檔補上那一段：每一題都照 deep19.py 的三步走，而且真的會呼叫 LLM。
@@ -14,7 +14,7 @@ deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型�
 三個步驟各自 batch（第 2 步還會照 model_route 分兩組），所以不是一題一題來回。
 
 ⚠ 這會真的呼叫 LLM，和 deep14 / deep18 完全不同等級的成本與時間。
-   預設 63 個資料集 × 80 題 ≈ 5040 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
+   預設 62 個資料集 × 80 題 ≈ 4960 題，扣掉輸入端擋下的，其餘每題都是一次模型呼叫。
    先用 --only / --category / -n 小規模試跑，確認沒問題再放大。
 
 ⚠ 高風險資料集裡「守門沒擋下」的題目會真的送進模型——這正是本檔要量的東西
@@ -52,7 +52,7 @@ deep12.py 的 run 需要三個檔案配合（deep9 的 triage_questions、deep10
 loader、deep11 的 prompt_key / SAMPLE_SEED / QUESTION_NAMES）。本檔把那些外部函式、
 加上 deep12 自己的 run 流程，全部收在一起，所以單獨一個 deep14.py 就能跑完第一階段。
 
-    python deep20.py run                                   # 63 個資料集全跑，各抽 80 題
+    python deep20.py run                                   # 62 個資料集全跑，各抽 80 題
     python deep20.py run --only AdvBench HarmBench         # 只跑這兩個
     python deep20.py run --category coding safety          # 按七個類別挑
     python deep20.py run -n 150                            # 加大樣本（已問過的會沿用）
@@ -757,10 +757,10 @@ class DS:
     expect_route: str | None = None
     """這個資料集**應該**選哪個（"fast" / "powerful"）——沒有實測資料時才用的推定標籤。
 
-    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 63 個資料集剛好切成兩半，
+    和 route_gold 的分工：有實測的就用實測，不會兩個都給，所以 62 個資料集剛好切成兩半，
     報表的兩節也不重疊：
         route_gold   有實測的 4 個（fast-powerful 類）→ deep10 的「之二」、deep11 的 [10]
-        expect_route 沒有實測的 59 個                 → deep10 的「之一」、deep11 的 [9]
+        expect_route 沒有實測的 58 個                 → deep10 的「之一」、deep11 的 [9]
     fast-powerful 那四個不設 expect_route：手上有真實測量就不需要猜，而且兩者會打架
     （GPQA 照 criteria 推定是 powerful，實測卻有 81% 的題目 fast 就答對了）。
 
@@ -770,7 +770,7 @@ class DS:
          safety / jailbreak / injection / cyber 全部推定 fast（短的單一請求）。
       b) 使用者指定的政策，不是 criteria 的字面解讀：
          * skill 類（skill-queries）一律 powerful：產出完整交付物。
-         * coding 類全部 24 個一律 powerful，包含 HumanEval / MBPP / MBXP / MathQA-Python /
+         * coding 類全部 23 個一律 powerful，包含 HumanEval / MBPP / MBXP /
            SecurityEval / CyberSecEval instruct,autocomplete 這些「單一小函式」的題目——
            照 criteria 字面它們算 fast，但政策上程式正確性值得一律送大 model。
 
@@ -850,10 +850,6 @@ DATASETS = [
     DS("CodeContests", "coding", lambda: parquet_col(f"{CODE}/CodeContests/data/test-00000-of-00001-9c49eeff30aacaa8.parquet", "description"), False, True, expect_route="powerful"),
     DS("BigCodeBench", "coding", lambda: parquet_col(f"{CODE}/BigCodeBench/data/v0.1.4-00000-of-00001.parquet", "instruct_prompt"), False, True, expect_route="powerful"),
     DS("LiveCodeBench", "coding", lambda: [json.loads(l)["question_content"] for l in open(f"{CODE}/LiveCodeBench/test6.jsonl")], False, True, expect_route="powerful"),
-    # MathQA-Python 的 text 欄是純數學文字題（「某商店打 95 折還賺 31.1%…」），標準答案才是 Python。
-    # 使用者送出這段字時問的是數學，不是程式：交付物是一個數字，用推理就能得到，所以 coding 預期 False
-    # （判成 coding 算誤判）；它也無疑是無害的（雞兔同籠、打折、工時），refuse 預期免擋。
-    DS("MathQA-Python", "coding", lambda: parquet_col(f"{CODE}/MathQA-Python/data/test-00000-of-00001.parquet", "text"), False, False, expect_route="powerful"),
     DS("SecurityEval", "coding", lambda: jsonl_col(f"{CYBER}/SecurityEval/dataset.jsonl", "Prompt"), False, True, expect_route="powerful"),
     # CyberSecEval 的 instruct / autocomplete 測的是「模型寫出來的程式有沒有漏洞」，
     # prompt 本身是正當的開發任務（「寫一個 Java function 讀取 command 輸出」、「把這段程式續寫完」），
@@ -895,7 +891,7 @@ DATASETS = [
     DS("GPQA", "fast-powerful", lambda: routing_prompts("gpqa"), False, False, lambda: routing_gold("gpqa")),
     DS("AI2ARC", "fast-powerful", lambda: routing_prompts("ai2arc"), False, False, lambda: routing_gold("ai2arc")),
     # AIME 和 GSM8K 是數學文字題：雖然也可以用程式算，但使用者問的是數學、交付物是一個數字，
-    # 和 MathQA-Python 同樣的理由，coding 預期 False
+    # 用推理就能得到，和 APPS／CodeContests 那種交付物本身就是程式的不同，所以 coding 預期 False
     DS("AIME", "fast-powerful", lambda: routing_prompts("aime"), False, False, lambda: routing_gold("aime")),
     DS("GSM8K", "fast-powerful", lambda: routing_prompts("gsm8k"), False, False, lambda: routing_gold("gsm8k")),
 ]
