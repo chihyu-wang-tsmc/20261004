@@ -39,6 +39,7 @@ joined.jsonl 一題一行，欄位就是畫圖需要的全部：
     python deep20_report.py status                 # 檢查真資料齊不齊、缺的要跑什麼
     python deep20_report.py prepare                # 併資料（需要完整環境）
     python deep20_report.py report                 # 真資料的報表 + PNG + Excel
+    python deep20_report.py report --bench aime ai2arc    # 只算這幾個 bench（連「合計」也只含它們）
     python deep20_report.py report --dark          # 深色版 PNG（另存一份，不覆蓋淺色）
     python deep20_report.py report --appendix-b    # 多畫附錄 B（圖 B2 要掃 deep20_results/ 全部 50 個）
     python deep20_report.py report --with-random   # 圖 1/2 加回 Random 基準線（預設不畫）
@@ -55,12 +56,16 @@ router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣�
     python gpqa_routing.py answer --model qwen3.8-27b       # 每個要比的 fast、每個 bench 各跑一次
     python deep20_report.py report_muli_fast                # 自動找 answers/ 底下的 fast
     python deep20_report.py report_muli_fast --fast deepseek-flash qwen3.8-27b gemma-4-xxx
+    python deep20_report.py report_muli_fast --fast qwen3.8-27b gemma-4-xxx --bench aime ai2arc
+                                                            # 只比這兩個 bench（疊圖就是 2×2 = 4 條線）
     python deep20_report.py report_muli_fast --mock         # 示意資料（三個假的 fast）
     python deep20_report.py report_muli_fast --per-fast full    # 每個 fast 另出和 report 一樣的整套
     python deep20_report.py report_muli_fast --dark         # 深色版
     （report_multi_fast 是同一個指令的別名）
 
 只比「每個 fast 都有有效作答」的交集；缺哪個 bench 的哪些題，報表開頭的 [覆蓋] 會列出要跑的指令。
+--bench 可以只挑幾個 bench 比，**連「合計」也只含選到的那幾個**（合計是這些題併起來算的），
+所以 --bench 跑出來的數字不能和沒篩的那份並排看。
 各 fast 的單價填在 FAST_PRICES，沒填的暫用 PRICES["fast"]，報表與圖上會標出來。
 
 ---- 產出 ----
@@ -84,6 +89,9 @@ router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣�
     deep20_report/fig2_per_bench_norm.png   同上，Y 改成「補回 oracle 差距的比例」，四格同一把尺
     deep20_report/fig2_per_bench_norm_tau_axis.png   同上，上方標 τ
     deep20_report/fig3_routep.png     正文圖 3：route_p 按 ground truth 分層
+    deep20_report/fig4_bench_overlay.png    正文圖 4：四個 bench 四條線疊在同一組 X / Y 軸，
+                                      每條線標自己的門檻 τ（實心圓 + 數值），端點是空心圓
+    deep20_report/fig4_bench_overlay_norm.png   同上，Y 改成「補回 oracle 差距的比例」
     deep20_report/figA1_y_axis.png    附錄 A 圖 A1：為什麼 Y 軸用 end-to-end 正確率
     deep20_report/figA2_calibration.png  附錄 A 圖 A2：校準圖 + ECE
     deep20_report/figB1_guard_cost.png   附錄 B 圖 B1：含／不含守門開銷
@@ -92,10 +100,16 @@ router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣�
         curve_tau_axis[_<bench>].png        各 fast 的藍線疊在一起，上方 τ（每個 fast 共用）
         cost[_<bench>].png                  X 換成 $ 每千題（各 fast 的 $ 不同，不能共用呼叫比例軸）
         per_bench_tau_axis.png              四個 bench 各一格
+        bench_overlay.png                   四個 bench × 每個 fast 全疊在同一組 X / Y 軸，
+                                            全部實線，每條線標自己的門檻 τ（實心圓 + 數值，
+                                            0.9/0.7/0.5/0.3/0.1）。色相 = bench、深淺 = fast
+                                            （只有這張是這樣配，圖例一條線一項）
+        bench_overlay_norm.png              同上，Y 改成「補回 oracle 差距的比例」
         curve_tau_axis[_<bench>]_explained.png / _explained_chart.png / _explained.txt
                                             說明版（圖上標 1–5、右邊逐項推導）與拆開的圖／文字
         tables.xlsx                         各 fast × 各 bench 的摘要、作答覆蓋、曲線、逐題資料
-        <fast>/                             每個 fast 單一 fast 的 fig1_main_tau_axis 與說明版
+        <fast>/                             每個 fast 單一 fast 的 fig1_main_tau_axis、說明版
+                                            與 fig4_bench_overlay[_norm]（四條線版，標得完 τ）
                                             （--per-fast full 時是和 report 一樣的整套）
     deep20_report/tables.xlsx         表 1（摘要）／表 A1（各 bench）／表 A2（能力重疊，逐 dataset
                                       的 fast×powerful 2×2）／表 A3（混淆矩陣）／校準分箱／
@@ -449,6 +463,25 @@ def conf_by_dataset():
             meta = res.get("meta", {})
             out[meta.get("dataset", fn[:-5])] = (meta.get("category", "?"), np.array(vals))
     return out
+
+
+def pick_benches(rows, wanted):
+    """--bench 的篩選：只留下選到的 bench。wanted 是名字清單（不分大小寫），None = 全部。
+
+    打錯名字直接報錯並列出有哪些，不要靜靜地少比一個 —— 合計是「選到的那幾個 bench
+    併起來」算的，少一個 bench 整張表的數字都會跟著變，但表面上看不出來。
+    """
+    have = sorted({r["bench"] for r in rows})
+    if not wanted:
+        return rows, have
+    lower = {b.lower(): b for b in have}
+    picked = list(dict.fromkeys(w.lower() for w in wanted))   # 去重、保留給的順序
+    bad = [w for w in picked if w not in lower]
+    if bad:
+        raise SystemExit(f"--bench 沒有這些：{' / '.join(bad)}"
+                         f"（這份資料有的是：{' / '.join(have)}）")
+    keep = {lower[w] for w in picked}
+    return [r for r in rows if r["bench"] in keep], sorted(keep)
 
 
 def load_joined(args):
@@ -1218,6 +1251,20 @@ def _acc_range(a):
             max(a["ceiling"], a["router"]["acc"].max()))
 
 
+def bench_scale(a, y):
+    """單一 bench 的 Y 換算。y="norm" 以外原樣回傳，所以呼叫端不必分兩條路寫。
+
+    norm = (acc − acc_fast) / (ceiling − acc_fast)：0 = 全送 fast、1 = oracle 天花板。
+    分母用天花板而不是全送 powerful —— GSM8K 兩個 model 正確率一樣，用後者分母會是 0。
+    gap ≤ 0（router 已經在天花板上）時整條壓成 0，不要除出 inf 把 Y 軸撐爛。
+    """
+    if y != "norm":
+        return lambda v: np.asarray(v, dtype=float)
+    gap = a["ceiling"] - a["acc_fast"]
+    return lambda v: ((np.asarray(v, dtype=float) - a["acc_fast"]) / gap if gap > 0
+                      else np.zeros_like(np.asarray(v, dtype=float)))
+
+
 def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fixed"):
     """正文圖 2：四個 bench 分開。y 決定 Y 軸怎麼取，三種各存一張：
 
@@ -1236,13 +1283,17 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fi
     if y == "norm" and tau == "curve":
         raise ValueError("norm 版只支援 tau=None / 'axis'：曲線上的 τ 記號畫的是原始正確率")
     names = list(per_bench)
-    fig, axes = plt.subplots(2, 2, figsize=(9.4, 6.6))
+    # 格數跟著 bench 數走（--bench 可能只選兩個）。多出來的格子要 set_visible(False)，
+    # 不然會留下一個沒畫東西、連樣式都沒套的空白預設座標軸。做法同 fig_multi_per_bench。
+    ncols = 2 if len(names) > 1 else 1
+    nrows = math.ceil(len(names) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(9.4, max(3.3 * nrows, 3.6)),
+                             squeeze=False)
+    for ax in axes.ravel()[len(names):]:
+        ax.set_visible(False)
 
     def scale(a):
-        if y != "norm":
-            return lambda v: np.asarray(v)
-        gap = a["ceiling"] - a["acc_fast"]
-        return lambda v: (np.asarray(v) - a["acc_fast"]) / gap if gap > 0 else np.zeros_like(v)
+        return bench_scale(a, y)
 
     if y == "norm":
         y_lo = min(0.0, *(float(scale(a)(a["router"]["acc"]).min()) for a in per_bench.values()))
@@ -1320,6 +1371,159 @@ def fig2_per_bench(per_bench, c, path, band=False, random=False, tau=None, y="fi
         fig.supylabel("share of oracle gap recovered", color=c["ink2"], fontsize=9.5)
     # 和圖 1 一致：標題與頁尾說明不畫在圖上，留給報告的圖說
     fig.tight_layout(rect=(0, 0.02, 1, 1))
+    _save(fig, path, c)
+
+
+# ---- 正文圖 4：四個 bench 疊在同一組 X / Y 軸 ----
+# 記號用實心圓（圖 1 做法 A 用的是菱形）：那張只有一條線，記號和線一定是同一個顏色；
+# 這張四條線，記號要能一眼對回自己那條線，所以換成和線同色的實心圓，端點改用空心圓。
+# τ 只取五檔（和 small_tau_axis 一樣）：四條線 × 九檔 = 36 個數字，標不下。
+BENCH_TAU_TICKS = (0.9, 0.7, 0.5, 0.3, 0.1)
+
+# 標籤的候選方位（偏移點數, ha）：先試右下（和做法 A 一致），再右上、左下、左上
+TAU_LABEL_OFFSETS = ((5, -10, "left"), (5, 5, "left"), (-5, -10, "right"), (-5, 5, "right"))
+
+
+def _box_free(taken, box):
+    """box 和已經放好的任何一個標籤框都不重疊就回 True。座標是 display（像素）。"""
+    x0, y0, x1, y1 = box
+    return not any(x0 < bx1 and bx0 < x1 and y0 < by1 and by0 < y1
+                   for bx0, by0, bx1, by1 in taken)
+
+
+def draw_tau_dots(ax, pts, c, color, taken, ms=5.5, fontsize=7.5, bounds=None):
+    """一條 bench 曲線上的 τ：實心圓記號 + 旁邊標 τ 值。回傳實際標了字的檔數。
+
+    pts 是 [(τ, 呼叫比例, Y)]，Y 已經照該張圖的 y 版本換算過（norm 版不是正確率）。
+
+    四條線疊在一起時，thin_labels 的橫向間距不夠用：它只看同一條線上相鄰兩檔的距離，
+    管不到別的 bench 已經在同一塊地方標了字。所以每個標籤試四個方位，四個都撞到就
+    只留記號不標字 —— 寧可少一個數字，不要疊成一團看不出是誰的。
+    taken 是累積的標籤框，由呼叫端建立並依序傳給每個 bench（先畫的優先佔位）。
+
+    bounds（繪圖區的 display bbox）給了就要求標籤整個落在裡面：τ=0.9 的落點幾乎貼著
+    左緣、τ=0.1 貼著右緣，不擋的話標籤會伸到軸外被裁掉。擋掉的那一邊會改試另一邊。
+    記號本身被 Y 軸範圍裁掉時（norm 版的起手段）四個方位都會在界外，那一檔就只剩記號。
+    """
+    ax.plot([q[1] for q in pts], [q[2] for q in pts], "o", ms=ms, color=color,
+            markeredgecolor=c["surface"], markeredgewidth=1.2, ls="", zorder=7)
+    px = ax.get_figure().dpi / 72.0   # 點 → display 像素（估標籤框大小用）
+    done = 0
+    for tv, x, yv in pts:
+        s = f"{tv:g}"
+        w, h = 0.62 * fontsize * len(s) * px, 1.25 * fontsize * px
+        mx, my = ax.transData.transform((x, yv))
+        for dx, dy, ha in TAU_LABEL_OFFSETS:
+            # va="baseline"：文字從基線往上長，所以框是 [基線, 基線 + 字高]
+            bx = mx + dx * px - (0 if ha == "left" else w)
+            by = my + dy * px
+            box = (bx, by, bx + w, by + h)
+            if bounds is not None and not (bounds.x0 <= box[0] and box[2] <= bounds.x1
+                                           and bounds.y0 <= box[1] and box[3] <= bounds.y1):
+                continue
+            if _box_free(taken, box):
+                ax.annotate(s, (x, yv), textcoords="offset points", xytext=(dx, dy),
+                            ha=ha, va="baseline", color=color, fontsize=fontsize, zorder=8)
+                taken.append(box)
+                done += 1
+                break
+    return done
+
+
+def fig4_bench_overlay(per_bench, c, path, y="acc", random=False, title=None):
+    """正文圖 4：四個 bench 四條線、同一組 X / Y 軸，每條線標自己的門檻 τ（實心圓 + 數值）。
+
+    和圖 2 的分工：圖 2 是四格，每格一個 bench、Y 軸各自取（只有 _norm 那版四格同尺）；
+    這張是一組軸四條線，同一個 X 位置上四個 bench 的高度可以直接比，也看得到誰的曲線先抬。
+
+    y="acc"（fig4_bench_overlay）：Y = end-to-end 正確率，照原始高度疊。看得到四個 bench
+        的絕對水平差多少（AIME 低、GSM8K 高），代價是各 bench 自己的落差被壓扁 ——
+        AI2ARC 整段只有 0.5 分，在這把尺上幾乎是平的，那個細節要看 fig2_per_bench_zoom。
+    y="norm"（fig4_bench_overlay_norm）：Y 改成「補回 oracle 差距的比例」
+        (acc − acc_fast) / (ceiling − acc_fast)，0 = 全送 fast、1 = oracle 天花板。
+        四條線同一把尺，比的是 router 在各 bench 的排序能力；差距本身多大寫在圖例裡。
+        換算和分母的取法見 bench_scale。曲線可以低於 0：先升級到「fast 對、powerful 錯」
+        的題目時就會。
+
+    這張不畫 oracle、也不畫天花板箭頭：四條線再加四條 oracle 就看不清了，那個看圖 2。
+    X 也不標 $／千題的第二套刻度：各 bench 的 token 用量不同，$ 不能共用一條呼叫比例軸
+    （和 fig_multi_cost 不能共用的理由一樣）。--tau 不影響這張，τ 是它的主體。
+    """
+    import matplotlib.pyplot as plt
+    names = list(per_bench)
+    col = {name: c["cat"][i % len(c["cat"])] for i, name in enumerate(names)}
+    fig, ax = plt.subplots(figsize=(9.6, 6.0))
+    style_axes(ax, c)
+
+    def scale(a):
+        return bench_scale(a, y)
+
+    for name in names:
+        a, f = per_bench[name], scale(per_bench[name])
+        r = a["router"]
+        if random:
+            d = a["random"]
+            ax.plot(d["call"], f(d["acc"]), color=col[name], lw=1.0, ls=(0, (5, 4)),
+                    alpha=0.65, zorder=2)
+        ax.plot(r["call"], f(r["acc"]), color=col[name], lw=2.0, zorder=3)
+        # 兩個端點用空心圓，和 τ 的實心圓分開：x=0 全送 fast、x=1 全送 powerful
+        for xe, ye in ((0.0, a["acc_fast"]), (1.0, a["acc_pow"])):
+            ax.plot([xe], [float(f(ye))], "o", ms=6, markerfacecolor=c["surface"],
+                    markeredgecolor=col[name], markeredgewidth=1.6, zorder=6)
+
+    if y == "norm":
+        lo = min(0.0, *(float(scale(a)(a["router"]["acc"]).min())
+                        for a in per_bench.values()))
+        lo, hi = lo - 0.10, 1.10
+    else:
+        lo_d = min(min(a["acc_fast"], float(a["router"]["acc"].min()))
+                   for a in per_bench.values())
+        hi_d = max(max(a["acc_pow"], float(a["router"]["acc"].max()))
+                   for a in per_bench.values())
+        pad = max((hi_d - lo_d) * 0.08, 0.01)
+        lo, hi = max(0.0, lo_d - pad), min(1.0, hi_d + pad)
+    ax.set_xlim(-0.03, 1.03)
+    ax.set_ylim(lo, hi)
+    pct_axis(ax.yaxis)
+    ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    ax.set_xlabel("powerful call rate", color=c["ink2"])
+    ax.set_ylabel("share of oracle gap recovered" if y == "norm" else "end-to-end accuracy",
+                  color=c["ink2"])
+    if title:
+        ax.set_title(title, color=c["ink"], fontsize=11, loc="left", pad=8)
+
+    handles = []
+    for name in names:
+        a = per_bench[name]
+        label = f"{name.upper()}　n = {a['n']}" if ZH else f"{name.upper()}  n = {a['n']}"
+        if y == "norm":  # 同一把尺的代價：各 bench 的 1.0 代表的分數不一樣，寫出來
+            label += f"　gap {a['ceiling'] - a['acc_fast']:.1%}" if ZH                 else f"  gap {a['ceiling'] - a['acc_fast']:.1%}"
+        handles.append(plt.Line2D([], [], color=col[name], lw=2.0, label=label))
+    handles.append(plt.Line2D([], [], color=c["ink2"], marker="o", ls="", ms=5.5,
+                              markeredgecolor=c["surface"], markeredgewidth=1.2,
+                              label="threshold τ (value next to the mark)"))
+    handles.append(plt.Line2D([], [], color=c["ink2"], marker="o", ls="", ms=6,
+                              markerfacecolor=c["surface"], markeredgewidth=1.6,
+                              label="all fast (x = 0) / all powerful (x = 1)"))
+    if random:
+        handles.append(plt.Line2D([], [], color=c["muted"], lw=1.0, ls=(0, (5, 4)),
+                                  label="Random (per bench)"))
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
+              ncols=3, labelcolor=c["ink2"], fontsize=8.5)
+
+    # τ 的記號和標籤一定要在 tight_layout 之後畫：避讓是用 display 座標算的，而
+    # tight_layout 會改 axes 的位置和大小，先畫就會對不上。_save 的 bbox_inches="tight"
+    # 只改存檔的裁切範圍、不動 axes，所以這之後位置不會再跑掉。
+    fig.tight_layout(rect=(0, 0.02, 1, 1))
+    taken, total, bounds = [], 0, ax.get_window_extent()
+    for name in names:
+        a, f = per_bench[name], scale(per_bench[name])
+        pts = [(tv, x, float(f(acc))) for tv, x, acc in tau_ladder(a, BENCH_TAU_TICKS)]
+        total += draw_tau_dots(ax, pts, c, col[name], taken, bounds=bounds)
+    want = len(names) * len(BENCH_TAU_TICKS)
+    if total < want:  # 標不下的是記號還在、只少了數字，不是少畫了作業點
+        print(f"  [note] {os.path.basename(path)}：{want} 個 τ 記號裡有 {want - total} 個"
+              f"標籤位置被佔住，只畫記號")
     _save(fig, path, c)
 
 
@@ -1641,6 +1845,8 @@ def write_excel(a, per_bench, data, path, args):
         {"項目": "資料來源", "值": "示意資料（--mock）" if args.mock else
          getattr(args, "source", None) or os.path.join(args.out, JOINED)},
         {"項目": "題數 N", "值": a["n"]},
+        {"項目": "bench 範圍", "值": " / ".join(b.upper() for b in per_bench)
+         + ("（--bench 篩選過，合計只含這幾個）" if getattr(args, "bench", None) else "（全部）")},
         {"項目": "fast model", "值": ROUTE_FAST},
         {"項目": "powerful model", "值": ROUTE_POWERFUL},
         {"項目": "fast 單價 $/1M（in / out）", "值": f"{PRICES['fast']['in']} / {PRICES['fast']['out']}"},
@@ -1699,6 +1905,9 @@ def print_report(a, per_bench, args):
     print(f"  model_route 成本／正確率權衡報告　N = {n}"
           f"　（{'示意資料' if args.mock else '真實資料'}）")
     print(f"  fast = {ROUTE_FAST}　powerful = {ROUTE_POWERFUL}")
+    # bench 範圍一定要印：--bench 篩過的話，底下每個「合計」都只含這幾個 bench
+    print(f"  bench = {' / '.join(b.upper() for b in per_bench)}"
+          + ("　（--bench 篩選過，合計只含這幾個）" if getattr(args, "bench", None) else ""))
     print(f"{'=' * 78}")
     if PRICES_ARE_PLACEHOLDER:
         print("\n  ⚠ PRICES 還是示意單價，所有 $ 的數字都不要引用（改 deep20_report.py 的 PRICES）")
@@ -1845,10 +2054,16 @@ def cmd_report(args):
     if args.boot is None:
         args.boot = 1000 if args.with_band else 0
     os.makedirs(args.out, exist_ok=True)
-    rows = load_joined(args)
+    # --bench 在進 Data 之前就濾掉，後面全部跟著走（表 1、各 bench 的表和圖、Excel）。
+    # 合計也只含選到的 bench —— 它是這些題併起來算的，不是各 bench 的平均。
+    rows, benches = pick_benches(load_joined(args), args.bench)
+    if args.bench:
+        print(f"\n--bench：只算 {' / '.join(b.upper() for b in benches)}"
+              f"（共 {len(rows)} 題；合計也只含這幾個 bench）")
     data = Data(rows)
     if data.n < 10:
-        raise SystemExit(f"只有 {data.n} 題，畫不出有意義的曲線")
+        raise SystemExit(f"只有 {data.n} 題，畫不出有意義的曲線"
+                         + ("（--bench 篩過，少了哪個 bench？）" if args.bench else ""))
     render_report(data, args, args.out)
 
 
@@ -1926,6 +2141,12 @@ def render_report(data, args, out):
                 fig2_per_bench(per_bench, c,
                                os.path.join(out, f"fig2_per_bench{tag}_tau_{stem}{sfx}.png"),
                                tau=variant, y=y, **kw)
+    # 圖 4：四個 bench 疊在同一組 X / Y 軸，兩版都出（原始正確率 / 補回 oracle 差距的比例）。
+    # 不吃 band：四條線再加四條誤差帶看不清，誤差帶看圖 1、圖 2。
+    for yv, tag in (("acc", ""), ("norm", "_norm")):
+        fig4_bench_overlay(per_bench, c,
+                           os.path.join(out, f"fig4_bench_overlay{tag}{sfx}.png"),
+                           y=yv, random=args.with_random)
     fig3_routep(data, a, c, os.path.join(out, f"fig3_routep{sfx}.png"))
     figA1_y_axis(a, c, os.path.join(out, f"figA1_y_axis{sfx}.png"))
     figA2_calibration(a, c, os.path.join(out, f"figA2_calibration{sfx}.png"))
@@ -2086,14 +2307,22 @@ def mock_multi_fast(base, models, seed=20261017):
 
 
 def load_multi_fast(args):
-    """回傳 (要比的 fast, {fast: rows}, 覆蓋表或 None)。"""
-    base = load_joined(args)
+    """回傳 (要比的 fast, {fast: rows}, 覆蓋表或 None)。
+
+    --bench 在這裡就先把題目濾掉，後面全部跟著走：主控台的表、每個 bench 的圖、
+    疊圖、Excel，連「合計」也只含選到的 bench（合計是這些題併起來算的，不是四個
+    bench 的平均）。自動找 fast 也只看選到的 bench 有沒有作答。
+    """
+    base, benches = pick_benches(load_joined(args), args.bench)
+    if args.bench:
+        print(f"\n--bench：只比 {' / '.join(b.upper() for b in benches)}"
+              f"（共 {len(base)} 題；合計也只含這幾個 bench）")
     if args.fast:
         models = list(dict.fromkeys(args.fast))  # 去重、保留順序（顏色照這個順序配）
     elif args.mock:
         models = [m for m, _, _ in MOCK_FAST]
     else:
-        models, partial = detect_fast_models(sorted({r["bench"] for r in base}))
+        models, partial = detect_fast_models(benches)
         print(f"\n沒給 --fast，自動找到 {len(models)} 個 fast：{' / '.join(models) or '（無）'}")
         if partial:
             print(f"  只有部分 bench 有作答、沒收進來：{' / '.join(partial)}"
@@ -2145,6 +2374,10 @@ def print_multi_fast(mm, models, coverage, args):
           f"　（{'示意資料' if args.mock else '真實資料'}）")
     print(f"  powerful = {ROUTE_POWERFUL}（固定）　router = {ROUTER_NAME}")
     print(f"  fast = {' / '.join(models)}")
+    # bench 範圍一定要印：--bench 篩過的話，底下每個「合計」都只含這幾個 bench
+    benches = [b.upper() for b in mm[models[0]]["bench"]]
+    print(f"  bench = {' / '.join(benches)}"
+          + ("　（--bench 篩選過，合計只含這幾個）" if args.bench else ""))
     print(f"{'=' * 78}")
     if PRICES_ARE_PLACEHOLDER:
         print("\n  ⚠ PRICES 還是示意單價，所有 $ 的數字都不要引用（改 deep20_report.py 的 PRICES / FAST_PRICES）")
@@ -2426,6 +2659,133 @@ def fig_multi_per_bench(mb, models, c, path):
     _save(fig, path, c)
 
 
+# ---- 多 fast 圖 4：四個 bench × 每個 fast，全部疊在同一組 X / Y 軸 ----
+# 顏色在這張**不是**照 fast_colors 配的，是照 bench 配（和 fig4_bench_overlay 同一組顏色，
+# 兩張圖對得起來）。multi_fast/ 其他圖都是「顏色 = fast」，只有這張不是，所以圖例把每一條
+# 線各列一項（BENCH + fast + n），顏色就是線上那個深淺，不要讀者自己去配對。
+#
+# 全部畫實線，fast 只能靠同色系的深淺分：第一個 fast 用原色，後面依序往背景色調淡。
+# 這比虛線弱 —— 深淺差只有兩三階分得清楚，fast 多了就不要用這張，看 per_bench_tau_axis
+# 或各 fast 自己的 fig4_bench_overlay。
+#
+# τ 五檔和單一 fast 版同一組（BENCH_TAU_TICKS）。4 bench × 3 fast × 5 檔 = 60 個數字，
+# draw_tau_dots 的避讓一定會擠掉一些 —— 擠掉幾個會印出來，要全部看得到就看每個 fast
+# 自己那張 fig4_bench_overlay（--per-fast 會出，一張只有四條線）。
+MAX_SHADE = 0.55   # 調淡的上限：再淡在淺色背景上就和格線差不多了
+
+
+def fast_shades(base, n, c):
+    """同一個 bench 的顏色分給 n 個 fast：第 0 個是原色，之後依序往背景色調淡。
+
+    n = 1 時就是原色（不要 0/0 除）。深色主題的背景是深的，調的方向跟著變暗，
+    兩邊都是「離背景越遠 = 越前面的 fast」。
+    """
+    from matplotlib.colors import to_rgb
+    rgb, bg = np.array(to_rgb(base)), np.array(to_rgb(c["surface"]))
+    return [tuple(rgb + (bg - rgb) * (MAX_SHADE * i / max(n - 1, 1))) for i in range(n)]
+
+
+def fig_multi_bench_overlay(by_bench, models, c, path, y="acc"):
+    """多 fast 圖 4：每個 bench 每個 fast 一條線，全部同一組 X / Y 軸，每條線標自己的 τ。
+
+    by_bench 是 {bench: {fast: analyse()}}，和 fig_multi_per_bench 吃的同一份。
+
+    和 per_bench_tau_axis 的分工：那張是四格、格內疊 fast，Y 軸各格自己放大，所以看得到
+    單一 bench 的細節但跨格不能比高度；這張是一組軸、bench × fast 條線全疊上去，
+    同一個 X 位置上誰高誰低可以直接讀。
+
+    y="acc"（bench_overlay）：Y = end-to-end 正確率。
+    y="norm"（bench_overlay_norm）：Y = 補回 oracle 差距的比例（見 bench_scale）。
+        注意每條線的分母是它自己那組 (bench, fast) 的 gap，三個 fast 的 gap 不一樣
+        （換 fast 會改變天花板和全送 fast 的正確率），所以 1.0 代表的分數每條線不同。
+        各自是多少在 tables.xlsx 的「摘要_fast比較」（oracle 天花板 − 全送 fast 正確率）。
+
+    這張不畫 oracle、不畫天花板箭頭、X 也不標 $：理由同 fig4_bench_overlay。
+    """
+    import matplotlib.pyplot as plt
+    names = list(by_bench)
+    # col[(bench, fast)]：bench 決定色相、fast 決定深淺（全部實線，只剩深淺可以分）
+    col = {(b, m): sh for i, b in enumerate(names)
+           for m, sh in zip(models, fast_shades(c["cat"][i % len(c["cat"])], len(models), c))}
+    if len(models) > 3:
+        print(f"  [note] {len(models)} 個 fast 全畫實線，只靠深淺分會看不出來"
+              f"（深淺差頂多三階）：建議看 per_bench_tau_axis 或各 fast 自己的圖")
+    fig, ax = plt.subplots(figsize=(12.4, 7.8))
+    style_axes(ax, c)
+
+    for b in names:
+        for m in models:
+            a = by_bench[b][m]
+            f = bench_scale(a, y)
+            r = a["router"]
+            ax.plot(r["call"], f(r["acc"]), color=col[(b, m)], lw=1.8, zorder=3)
+            # 端點用空心圓，和 τ 的實心圓分開。x=0 全送 fast（每個 fast 不同高度）、
+            # x=1 全送 powerful（powerful 固定，所以同一個 bench 的幾條線收在同一點）
+            for xe, ye in ((0.0, a["acc_fast"]), (1.0, a["acc_pow"])):
+                ax.plot([xe], [float(f(ye))], "o", ms=5.5, markerfacecolor=c["surface"],
+                        markeredgecolor=col[(b, m)], markeredgewidth=1.5, zorder=6)
+
+    flat = [a for ma in by_bench.values() for a in ma.values()]
+    if y == "norm":
+        lo = min(0.0, *(float(bench_scale(a, y)(a["router"]["acc"]).min()) for a in flat))
+        lo, hi = lo - 0.10, 1.10
+    else:
+        lo_d = min(min(a["acc_fast"], float(a["router"]["acc"].min())) for a in flat)
+        hi_d = max(max(a["acc_pow"], float(a["router"]["acc"].max())) for a in flat)
+        pad = max((hi_d - lo_d) * 0.08, 0.01)
+        lo, hi = max(0.0, lo_d - pad), min(1.0, hi_d + pad)
+    ax.set_xlim(-0.03, 1.03)
+    ax.set_ylim(lo, hi)
+    pct_axis(ax.yaxis)
+    ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    ax.set_xlabel("powerful call rate", color=c["ink2"])
+    ax.set_ylabel("share of oracle gap recovered (own gap per line)" if y == "norm"
+                  else "end-to-end accuracy", color=c["ink2"])
+
+    # 圖例：一條線一項，標出它是哪個 bench 的哪個 fast，顏色就是線上那個深淺。
+    # matplotlib 是直欄填的且每欄等高，所以每個 fast 一欄（欄內四個 bench），
+    # 記號另外補成一欄 —— 要每欄一樣高才排得齊，不足的補空白項目。
+    rows = max(len(names), 2)
+    blank = lambda: plt.Line2D([], [], ls="", marker="", label=" ")
+    mark_h = [
+        plt.Line2D([], [], color=c["ink2"], marker="o", ls="", ms=5.5,
+                   markeredgecolor=c["surface"], markeredgewidth=1.2,
+                   label="threshold τ (value next to the mark)"),
+        plt.Line2D([], [], color=c["ink2"], marker="o", ls="", ms=5.5,
+                   markerfacecolor=c["surface"], markeredgewidth=1.5,
+                   label="all fast (x = 0) / all powerful (x = 1)"),
+    ]
+    handles = []
+    for m in models:
+        for b in names:
+            n_b = by_bench[b][m]["n"]
+            handles.append(plt.Line2D([], [], color=col[(b, m)], lw=2.2,
+                                      label=f"{b.upper()}　{m}　n = {n_b}" if ZH
+                                      else f"{b.upper()}  {m}  n = {n_b}"))
+        handles += [blank() for _ in range(rows - len(names))]
+    handles += [*mark_h, *(blank() for _ in range(rows - len(mark_h)))]
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.10),
+              ncols=len(models) + 1, labelcolor=c["ink2"], fontsize=8.5)
+
+    # τ 一定要在 tight_layout 之後畫（理由同 fig4_bench_overlay）。
+    # models 放外圈：--fast 先給的那個先佔標籤位置，和「依序配色」同一個優先順序。
+    fig.tight_layout(rect=(0, 0.02, 1, 1))
+    taken, total, bounds = [], 0, ax.get_window_extent()
+    for m in models:
+        for b in names:
+            a = by_bench[b][m]
+            f = bench_scale(a, y)
+            pts = [(tv, x, float(f(acc)))
+                   for tv, x, acc in tau_ladder(a, BENCH_TAU_TICKS)]
+            total += draw_tau_dots(ax, pts, c, col[(b, m)], taken, ms=5.0, fontsize=7.0,
+                                   bounds=bounds)
+    want = len(names) * len(models) * len(BENCH_TAU_TICKS)
+    if total < want:
+        print(f"  [note] {os.path.basename(path)}：{want} 個 τ 記號裡有 {want - total} 個"
+              f"標籤位置被佔住，只畫記號（要全部看得到：各 fast 的 fig4_bench_overlay）")
+    _save(fig, path, c)
+
+
 # ---- 說明版 ----
 def _multi_explained_chart(ax, ma, models, c):
     """說明版左邊的圖：多 fast 疊圖 + ①–⑤ 的標記 + τ = 0.5 的讀圖路徑。
@@ -2651,6 +3011,8 @@ def write_excel_multi(mm, models, coverage, path, args):
         {"項目": "資料來源", "值": "示意資料（--mock）" if args.mock else
          f"{os.path.join(args.out, JOINED)} + <bench>/answers/<fast>.jsonl"},
         {"項目": "題數 N（交集）", "值": ref["all"]["n"]},
+        {"項目": "bench 範圍", "值": " / ".join(b.upper() for b in ref["bench"])
+         + ("（--bench 篩選過，合計只含這幾個）" if args.bench else "（全部）")},
         {"項目": "powerful model（固定）", "值": ROUTE_POWERFUL},
         {"項目": "router", "值": ROUTER_NAME},
         {"項目": "fast models（顏色順序）", "值": " / ".join(models)},
@@ -2716,6 +3078,10 @@ def cmd_report_multi_fast(args):
     fig_multi_curve(overall, models, c, os.path.join(out, f"curve_tau_axis{sfx}.png"))
     fig_multi_cost(overall, models, c, os.path.join(out, f"cost{sfx}.png"))
     fig_multi_per_bench(by_bench, models, c, os.path.join(out, f"per_bench_tau_axis{sfx}.png"))
+    # 四個 bench × 每個 fast 全疊在一組軸上，兩版（原始正確率 / 補回 oracle 差距的比例）
+    for yv, tag in (("acc", ""), ("norm", "_norm")):
+        fig_multi_bench_overlay(by_bench, models, c,
+                                os.path.join(out, f"bench_overlay{tag}{sfx}.png"), y=yv)
     for b, ma in by_bench.items():
         fig_multi_curve(ma, models, c, os.path.join(out, f"curve_tau_axis_{b}{sfx}.png"),
                         title=f"{b.upper()}　n = {ma[models[0]]['n']}")
@@ -2742,6 +3108,10 @@ def cmd_report_multi_fast(args):
             with as_fast_model(m):
                 if args.per_fast == "explained":
                     fig1_tau_axis_set(mm[m]["all"], mm[m]["bench"], c, sub, sfx)
+                    # 疊圖版的 τ 標籤會互相擠掉，這裡一個 fast 只有四條線，標得完
+                    for yv, tag in (("acc", ""), ("norm", "_norm")):
+                        fig4_bench_overlay(mm[m]["bench"], c, os.path.join(
+                            sub, f"fig4_bench_overlay{tag}{sfx}.png"), y=yv)
                 else:  # full：和 report 完全同一套（主控台報表、全部的圖、tables.xlsx）
                     sub_args = argparse.Namespace(**{
                         **vars(args), "out": sub, "tau": "all", "with_band": False,
@@ -2766,6 +3136,9 @@ def main():
 
     p_rep = sub.add_parser("report", help="算報表、畫 PNG、寫 Excel")
     common(p_rep)
+    p_rep.add_argument("--bench", nargs="+", metavar="NAME",
+                       help=f"只算這幾個 bench（{' / '.join(BENCHES.values())}，不分大小寫）；"
+                            "不給就全部。表、圖、Excel 全部跟著只含選到的，連「合計」也是")
     p_rep.add_argument("--mock", action="store_true", help="用示意資料跑（沒有真資料時先看版面）")
     p_rep.add_argument("--dark", action="store_true", help="輸出深色版 PNG（檔名加 _dark，不覆蓋淺色）")
     p_rep.add_argument("--appendix-b", action="store_true", help="多畫附錄 B 的圖 B1 / B2")
@@ -2788,6 +3161,10 @@ def main():
     p_mf.add_argument("--fast", nargs="+", metavar="MODEL",
                       help="要比的 fast（= <bench>/answers/<MODEL>.jsonl 的檔名），依序配色；"
                            "不給就自動找每個 bench 都有作答檔的 model")
+    p_mf.add_argument("--bench", nargs="+", metavar="NAME",
+                      help=f"只比這幾個 bench（{' / '.join(BENCHES.values())}，不分大小寫）；"
+                           "不給就全部。主控台的表、每個 bench 的圖、疊圖、Excel 全部跟著只含"
+                           "選到的，連「合計」也只含這幾個 bench")
     p_mf.add_argument("--mock", action="store_true", help="用示意資料跑（沒有真資料時先看版面）")
     p_mf.add_argument("--dark", action="store_true", help="輸出深色版 PNG（檔名加 _dark，不覆蓋淺色）")
     p_mf.add_argument("--per-fast", choices=("explained", "full", "none"), default="explained",

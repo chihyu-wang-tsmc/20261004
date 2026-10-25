@@ -15,8 +15,8 @@
 題目在 gsm8k/gsm8k_test.jsonl（HuggingFace 的 openai/gsm8k，main config 的 test split，1319 題），
 先跑 python download_benchmarks.py --only gsm8k 下載。
 
-每個子命令都可以加 --n（預設 200）：1319 題跑兩個 model 太貴，所以固定 seed 隨機抽 N 題，
-每個子命令、每次執行抽到的都是同一批。--n 0 是全部 1319 題。
+每個子命令都可以加 --n（預設 0 = 全部 1319 題）：給 N 就用固定 seed 隨機抽 N 題，
+每個子命令、每次執行抽到的都是同一批。1319 題要跑兩個 model，要省錢或先試跑就給 N。
 GSM8K 是小學程度的應用題，對現在的 model 幾乎都是 fast 就夠，所以這個 benchmark 主要在看
 router 會不會把簡單題誤判成 powerful（白用大 model）。報表的分組是解題步數（gold solution 的行數），
 步數越多的題目才比較有機會需要 powerful。
@@ -90,7 +90,8 @@ def grade(text, q):
 
 
 def add_arguments(parser):
-    parser.add_argument("--n", type=int, default=200, help="隨機抽幾題（固定 seed；0 = 全部 1319 題）")
+    parser.add_argument("--n", type=int, default=0,
+                        help="隨機抽幾題（固定 seed；預設 0 = 全部 1319 題）")
 
 
 GSM8K = Bench(

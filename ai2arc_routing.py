@@ -17,7 +17,8 @@ test split：ARC-Challenge 1172 題、ARC-Easy 2376 題），先跑 python downl
 
 每個子命令都可以加：
     --subset challenge / easy / all   用哪個 subset（預設 all，兩個都用）
-    --n N                            每個 subset 固定 seed 隨機抽 N 題（預設 150；0 = 全部）
+    --n N                            每個 subset 固定 seed 隨機抽 N 題（預設 0 = 全部 3548 題：
+                                     challenge 1172 + easy 2376。兩個 model 都要跑，要省就給 N）
 固定 seed 的意思是每個子命令、每次執行抽到的都是同一批題目。
 
 Easy 和 Challenge 一起跑的用意是：同一個領域（小學到高中的科學題）裡有難易兩種，
@@ -93,7 +94,8 @@ def grade(text, q):
 
 def add_arguments(parser):
     parser.add_argument("--subset", choices=[*SUBSETS, "all"], default="all", help="用哪個 ARC subset（預設 all）")
-    parser.add_argument("--n", type=int, default=150, help="每個 subset 隨機抽幾題（固定 seed；0 = 全部）")
+    parser.add_argument("--n", type=int, default=0,
+                        help="每個 subset 隨機抽幾題（固定 seed；預設 0 = 全部 3548 題）")
 
 
 AI2ARC = Bench(
