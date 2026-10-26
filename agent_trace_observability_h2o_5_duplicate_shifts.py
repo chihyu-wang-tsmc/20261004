@@ -32,6 +32,7 @@ outcome、reaction。任務完成、使用者滿意，不用問 clarity / attrib
 用法：
     python agent_trace_observability_h2o_5_duplicate_shifts.py           # 問 h2o-lightning，跟官網並排
     python agent_trace_observability_h2o_5_duplicate_shifts.py --check   # 不連服務：驗證資料和 workflow 重算
+    python agent_trace_observability_h2o_5_duplicate_shifts.py --dump    # 另外存下每次呼叫 h2o 的完整 request / response
 """
 
 from agent_trace_observability_h2o import main

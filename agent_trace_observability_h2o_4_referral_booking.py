@@ -36,6 +36,7 @@ fable 是 0.55、0.86），兩個 reference 之後又分成 overt / silent failu
 用法：
     python agent_trace_observability_h2o_4_referral_booking.py           # 問 h2o-lightning，跟官網並排
     python agent_trace_observability_h2o_4_referral_booking.py --check   # 不連服務：驗證資料和 workflow 重算
+    python agent_trace_observability_h2o_4_referral_booking.py --dump    # 另外存下每次呼叫 h2o 的完整 request / response
 """
 
 from agent_trace_observability_h2o import main
