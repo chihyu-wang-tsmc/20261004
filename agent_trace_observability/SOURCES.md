@@ -5,6 +5,7 @@
 | 檔案 | 來源 |
 | --- | --- |
 | `cases.json` | https://evals.typesafe.ai/agent_trace_observability-cases.js?v=4a3821a2（2026-10-25 下載） |
+| `case5_h2o_calls_preview.md` | 第 5 題（Duplicate shifts prompt cache purge）3 次呼叫 h2o 的完整 request body，用 `agent_trace_observability_h2o.py` 的程式從 `cases.json` 產生；h2o 的輸出是 2026-10-25 實跑時 console 印的值（四捨五入到兩位）。完整的原始 response 要用 `--dump` 跑 |
 
 頁面是 https://evals.typesafe.ai/agent_trace_observability，`cases.js` 是頁面底下「View examples」的資料。
 
