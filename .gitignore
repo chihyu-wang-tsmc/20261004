@@ -88,3 +88,6 @@ classifying_rag_passages_h2o_nemotron/
 
 # rerank_h2o.py 的快取（CLERC 的 corpus 約 8 MB、1,200 個 noul）、圖、playground 題目，每次跑都會重生
 rerank_h2o/
+
+# agent_trace_observability_h2o*.py --dump 的輸出（每次呼叫 h2o 的完整 request / response），每次跑都會重生
+agent_trace_observability_h2o/

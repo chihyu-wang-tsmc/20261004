@@ -73,18 +73,25 @@ claims_supported、in_scope）贏的那邊不變，不受影響；P(worked) 是�
     python agent_trace_observability_h2o_1_email_update.py      # 跑一題（其他四題同理）
     python agent_trace_observability_h2o.py                     # 5 題一起跑，最後印總表
     python agent_trace_observability_h2o.py --check             # 不連服務：用官網的答案驗證 workflow 和組出來的文件
+    python agent_trace_observability_h2o_5_duplicate_shifts.py --dump   # 另外存下每次呼叫的完整紀錄
     H2O_ENDPOINT=http://127.0.0.1:8741 python agent_trace_observability_h2o.py   # 指定服務網址
+
+`--dump` 會把每一次呼叫 h2o 的完整紀錄存到 agent_trace_observability_h2o/<題號>_<名稱>.json 和 .md：
+送出去的 HTTP request body（state 和 questions，跟 shim 收到的一字不差）、shim 原樣回的
+response body、流程實際用到的答案、流程走的路和最後的決定。用來展示 h2o 在每一步看到什麼、答了什麼。
 """
 
 import json
 import os
 import re
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache
 from pathlib import Path
 from time import perf_counter
 
+import httpx2
 from langchain_typesafe import Choice, Noul, Score
 from langchain_typesafe.client import (
     TypeSafeAPIConnectionError,
@@ -96,6 +103,7 @@ from classifier_h2o import H2O_BASE_URL, H2OClassifier
 
 HERE = Path(__file__).resolve().parent
 DATA_PATH = HERE / "agent_trace_observability" / "cases.json"
+DUMP_DIR = HERE / "agent_trace_observability_h2o"  # --dump 的輸出
 
 EVAL = json.loads(DATA_PATH.read_text(encoding="utf-8"))["eval"]
 DOCUMENTS: list[dict] = EVAL["documents"]
@@ -442,11 +450,36 @@ def decide(answers: dict[str, dict], labels: dict[str, str] | None = None) -> di
 # ---- 問 h2o ----
 
 
+# 每個執行緒最後一次 HTTP 來回的原始內容（--dump 用）。ask() 在同一個執行緒裡呼叫，
+# 重試的話留下的是最後成功的那一次。
+_last_exchange = threading.local()
+
+
+def _record_exchange(response: httpx2.Response) -> None:
+    """httpx2 的 response hook：記下送出去的 request body 和 shim 原樣回的 response body。
+
+    H2OClassifier 解析時會照 TypeSafe 文件重算 confidence、補上 Noul 的 confidence，
+    這裡記的是那之前、shim 真正回的內容。
+    """
+    response.read()
+    try:
+        body = response.json()
+    except ValueError:
+        body = response.text
+    _last_exchange.value = {
+        "url": str(response.request.url),
+        "request": json.loads(response.request.content),
+        "status": response.status_code,
+        "response": body,
+    }
+
+
 @cache
 def client():
     # 官網問的是 TypeSafe；H2OClassifier 是 LangChain Runnable，重試用 with_retry
     # （第一次 + 重試 5 次，同 citation_check_h2o.py）
-    return H2OClassifier(base_url=ENDPOINT, timeout=120.0).with_retry(
+    http = httpx2.Client(timeout=120.0, event_hooks={"response": [_record_exchange]})
+    return H2OClassifier(base_url=ENDPOINT, timeout=120.0, client=http).with_retry(
         retry_if_exception_type=(
             TypeSafeAPIConnectionError,  # 包含 TypeSafeAPITimeoutError
             TypeSafeRateLimitError,
@@ -462,6 +495,7 @@ QUESTION_TYPES = {"noul": Noul, "score": Score, "choice": Choice}
 
 def ask(doc: dict, questions: dict[str, dict]) -> dict:
     started = perf_counter()
+    _last_exchange.value = None
     response = client().invoke(
         {
             "state": doc,
@@ -479,6 +513,7 @@ def ask(doc: dict, questions: dict[str, dict]) -> dict:
         "seconds": perf_counter() - started,
         "input_tokens": response.usage.input_tokens or 0,
         "model": response.model,
+        "exchange": _last_exchange.value,
     }
 
 
@@ -523,7 +558,7 @@ def table(header: list[str], rows: list[list[str]]) -> None:
         print(("  " + line).rstrip())
 
 
-def run_case(case_id: str) -> dict:
+def run_case(case_id: str, dump: bool = False) -> dict:
     number = CASE_IDS.index(case_id) + 1
     example = EVAL["examples"][number - 1]
     nodes = official_nodes(case_id)
@@ -647,6 +682,18 @@ def run_case(case_id: str) -> dict:
         )
         + f"；跟 Jev {'一樣 ✓' if actions['Jev'] == decision['action'] else '不同 ✗'}"
     )
+    if dump:
+        run = {
+            "nodes": nodes,
+            "asked": asked,
+            "built": built,
+            "labels": labels,
+            "decision": decision,
+            "actions": actions,
+            "refs": refs,
+        }
+        paths = dump_case(case_id, run)
+        print("\n  完整紀錄：" + "、".join(str(p.relative_to(HERE)) for p in paths))
     return {
         "number": number,
         "name": example["name"],
@@ -679,6 +726,150 @@ def print_summary(results: list[dict]) -> None:
         ["", "對到 reference", *(f"{hits[n]}/{len(results)}" for n in names), ""]
     )
     table(["#", "case", *names, "reference"], rows)
+
+
+# ---- --dump：存下每一次呼叫的完整紀錄 ----
+
+# 每種 node 在 workflow 裡的位置，和它的 state 裡有什麼（印在 .md 每次呼叫的開頭）
+NODE_PURPOSE = {
+    "safety": "第 1 層：這個不能復原、或帶條件的動作有沒有越權。state 只有動作當下的狀況："
+    "agent 的指示、這個操作的權限說明和工具屬性、動作之前的對話和 tool 結果、動作本身。",
+    "outcome": "第 2 層：任務有沒有完成。state 是整段紀錄：agent 的指示、對話、"
+    "每個 tool call 和結果、最後一則訊息。",
+    "reaction": "第 2 層：使用者滿不滿意。state 只有最後一則訊息和事後的回饋，看不到過程，"
+    "免得被過程影響。",
+    "clarity": "第 3 層（有完成、但使用者不滿時）：使用者的請求清不清楚、在不在 agent 的職責內。"
+    "state 只有 agent 的職責和使用者說過的話。",
+    "attribution": "第 3 層（沒完成、使用者也不滿時）：從哪一步開始出錯、問題出在哪。"
+    "state 是 agent 的職責、政策、可用工具、對話和每個 step。",
+}
+
+
+def answer_text(value) -> str:
+    """.md 裡「流程用到的答案」那一行：Noul 印 P(yes)，Score 印期望值和分佈，Choice 印分佈。"""
+    if isinstance(value, float | int):
+        return f"P(yes) = {value:.4f}"
+    ranked = " · ".join(f"{k}: {p:.3f}" for k, p in value.items())
+    if all(isinstance(level, int) for level in value):
+        expected = sum(level * p for level, p in value.items())
+        return f"期望值 {expected:.2f}（{ranked}）"
+    return ranked
+
+
+def dump_case(case_id: str, run: dict) -> tuple[Path, Path]:
+    """把 run_case 的結果存成 .json（完整、給程式讀）和 .md（給人看）。"""
+    number = CASE_IDS.index(case_id) + 1
+    example = EVAL["examples"][number - 1]
+    slug = re.sub(r"[^a-z0-9]+", "_", example["name"].lower()).strip("_")
+    stem = DUMP_DIR / f"{number}_{slug}"
+    nodes, asked = run["nodes"], run["asked"]
+    calls = [
+        {
+            "node": node,
+            "label": run["labels"].get(node),
+            "built_here": node in run["built"],
+            "seconds": round(result["seconds"], 3),
+            "http": result["exchange"],
+            "answers_used": result["answers"],
+        }
+        for node, result in asked.items()
+    ]
+    decision = run["decision"]
+    record = {
+        "case_id": case_id,
+        "name": example["name"],
+        "label": example["label"],
+        "endpoint": ENDPOINT,
+        "calls": calls,
+        "decision": {
+            key: decision[key]
+            for key in (
+                "action",
+                "state",
+                "safety_breach",
+                "needs_human",
+                "p_worked",
+                "p_left_undone",
+                "p_unhappy",
+                "quiet",
+                "path",
+            )
+        },
+        "compare": {
+            **{name: action for name, action in run["actions"].items()},
+            **{f"reference {ref['name']}": ref["action"] for ref in run["refs"]},
+        },
+    }
+    DUMP_DIR.mkdir(exist_ok=True)
+    json_path = stem.with_suffix(".json")
+    json_path.write_text(
+        json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+    total = sum(len(questions) for _, questions in nodes.values())
+    model = next(iter(asked.values()))["model"]
+    lines = [
+        f"# {number}. {example['name']}：h2o 的每一次呼叫",
+        "",
+        f"- case_id：`{case_id}`",
+        f"- 官網標籤：{example['label']}",
+        f"- 服務：`{ENDPOINT}`（{model}）",
+        (
+            f"- 共 {len(calls)} 次呼叫、{total} 題。每次呼叫都是 `POST /v1/systemone`，"
+            "body 是 `{state, questions}`：state 是這一步要看的文件，"
+            "questions 是這一步要回答的題目。"
+        ),
+        "- response body 是 shim 原樣回的內容；「流程用到的答案」是 workflow 實際拿去判斷的機率。",
+        "",
+    ]
+    for i, call in enumerate(calls, 1):
+        node = call["node"]
+        kind = "safety" if node.startswith("safety_") else node
+        title = node + (f"（{call['label']}）" if call["label"] else "")
+        purpose = NODE_PURPOSE[kind]
+        if call["built_here"]:
+            purpose += "官網沒問過這個 node，文件照官網的格式組。"
+        http = call["http"] or {}
+        lines += [
+            f"## 呼叫 {i}：{title}",
+            "",
+            purpose,
+            "",
+            (
+                f"耗時 {call['seconds']:.2f} 秒；`POST {http.get('url', '?')}`；"
+                f"HTTP {http.get('status', '?')}"
+            ),
+            "",
+            "### 送給 h2o 的 request body",
+            "",
+            "```json",
+            json.dumps(http.get("request"), ensure_ascii=False, indent=2),
+            "```",
+            "",
+            "### h2o 回的 response body",
+            "",
+            "```json",
+            json.dumps(http.get("response"), ensure_ascii=False, indent=2),
+            "```",
+            "",
+            "### 流程用到的答案",
+            "",
+        ]
+        questions = nodes[node][1]
+        lines += [
+            f"- `{qid}`（{questions[qid]['type']}）：{answer_text(value)}"
+            for qid, value in call["answers_used"].items()
+        ]
+        lines.append("")
+    lines += ["## 流程怎麼用這些答案", "", "```", *decision["path"], "```", ""]
+    lines += ["## 決定", "", "| | 結果 | 成本 |", "| --- | --- | --- |"]
+    lines += [
+        f"| {name} | {action[0]} | {action[1]} |"
+        for name, action in record["compare"].items()
+    ]
+    md_path = stem.with_suffix(".md")
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return json_path, md_path
 
 
 # ---- --check：不連服務，用官網的答案驗證 ----
@@ -790,10 +981,11 @@ def main(
     args = sys.argv[1:]
     if args == ["--check"]:
         sys.exit(0 if check(case_ids, expected) else 1)
-    if args:
-        sys.exit(f"用法：python {Path(sys.argv[0]).name} [--check]")
+    if args not in ([], ["--dump"]):
+        sys.exit(f"用法：python {Path(sys.argv[0]).name} [--check | --dump]")
+    dump = args == ["--dump"]
     try:
-        results = [run_case(case_id) for case_id in case_ids]
+        results = [run_case(case_id, dump) for case_id in case_ids]
     except TypeSafeAPIConnectionError as error:
         sys.exit(
             f"\n連不上 h2o-lightning（{ENDPOINT}）：{error}\n"

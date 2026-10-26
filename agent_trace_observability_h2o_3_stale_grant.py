@@ -33,6 +33,7 @@ follow-up yet on whether it's actually cleaned up or not."
 用法：
     python agent_trace_observability_h2o_3_stale_grant.py           # 問 h2o-lightning，跟官網並排
     python agent_trace_observability_h2o_3_stale_grant.py --check   # 不連服務：驗證資料和 workflow 重算
+    python agent_trace_observability_h2o_3_stale_grant.py --dump    # 另外存下每次呼叫 h2o 的完整 request / response
 """
 
 from agent_trace_observability_h2o import main

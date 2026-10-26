@@ -31,6 +31,7 @@ it seems like a lot got escalated that I didn't ask about. Hoping it actually ge
 用法：
     python agent_trace_observability_h2o_1_email_update.py           # 問 h2o-lightning，跟官網並排
     python agent_trace_observability_h2o_1_email_update.py --check   # 不連服務：驗證資料和 workflow 重算
+    python agent_trace_observability_h2o_1_email_update.py --dump    # 另外存下每次呼叫 h2o 的完整 request / response
 """
 
 from agent_trace_observability_h2o import main
