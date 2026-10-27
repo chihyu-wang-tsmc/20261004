@@ -713,6 +713,9 @@ def verilog_eval():
     檔案內容本身就是自然語言的 RTL 規格請求（「I would like you to implement a module
     named TopModule with the following interface…」）。同層的 dataset_code-complete-iccad2023
     是同一批題目的續寫版，和 McEval 的理由一樣不混進來。
+
+    這 156 個檔放在 repo 的 VerilogEval/（用法見那裡的 README.md），要先複製到 ~/code_benchmarks/ 才讀得到：
+      cp -r VerilogEval ~/code_benchmarks/
     """
     paths = sorted(glob.glob(f"{CODE}/VerilogEval/dataset_spec-to-rtl/*_prompt.txt"))
     return [open(p, encoding="utf-8").read() for p in paths]
