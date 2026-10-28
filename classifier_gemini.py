@@ -195,6 +195,10 @@ class GeminiClassifier(RunnableSerializable[ClassifierRequest, ClassifierRespons
     max_output_tokens: int = Field(default=8192, gt=0)
     """每個問題的輸出上限，思考的 token 也算在裡面。"""
 
+    response_schema: bool = True
+    """要不要送 responseMimeType + responseSchema（JSON mode）。不支援 JSON mode 的模型設 False：
+    只靠 system prompt 要求 JSON，答案照樣用同一套規則檢查（deep20_h2o_gemma4-31b.py 遇到時會自動改）。"""
+
     max_retries: int = Field(default=6, ge=0)
     """暫時性失敗（429 / 5xx / 連線 / 格式不對）最多重試幾次。"""
 
@@ -452,9 +456,13 @@ class GeminiClassifier(RunnableSerializable[ClassifierRequest, ClassifierRespons
                 + f"\n\nOutput probabilities over exactly these keys: {json.dumps(labels)}."
             )
         generation_config: dict[str, JsonValue] = {
-            "responseMimeType": "application/json",
+            "maxOutputTokens": self.max_output_tokens,
+            # 不送 temperature：Google 建議 Gemini 3 維持預設 1.0
+        }
+        if self.response_schema:
+            generation_config["responseMimeType"] = "application/json"
             # probabilities 的 key 必須剛好是這個問題的選項
-            "responseSchema": {
+            generation_config["responseSchema"] = {
                 "type": "OBJECT",
                 "properties": {
                     "probabilities": {
@@ -465,10 +473,7 @@ class GeminiClassifier(RunnableSerializable[ClassifierRequest, ClassifierRespons
                     }
                 },
                 "required": ["probabilities"],
-            },
-            "maxOutputTokens": self.max_output_tokens,
-            # 不送 temperature：Google 建議 Gemini 3 維持預設 1.0
-        }
+            }
         if self.thinking_level is not None:
             generation_config["thinkingConfig"] = {"thinkingLevel": self.thinking_level}
         return {
