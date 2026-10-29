@@ -11,6 +11,11 @@ jevk5 換成 H2O-Lightning-4B。所有的 CLI 參數（run / status / --only / -
     # 要讓報表的門檻掃到 1.0 都是確切值，用量測政策跑（見下面 MEASURE_POLICY）：
     python deep20_h2o.py run --guard-policy measure --only AdvBench -n 20 --refresh
 
+    # 只看 h2o 對 mode（chat / agent）那一題怎麼判，不呼叫 LLM、不寫 result（不需要 DASHSCOPE_API_KEY）：
+    python deep20_h2o.py mode                                  # 內建幾題（pptx-01 那題應該是 agent）
+    python deep20_h2o.py mode "幫我把 report.docx 轉成 PDF"     # 自訂 query
+    python deep20_h2o.py mode --skill pptx --expect agent      # skill-queries/pptx.json 的 30 題
+
 ---- 為什麼是覆寫 deep20 的三個全域，而不是整檔複製 ----
 
 deep20.py 刻意「不 import 任何 deep*」，是為了讓它自己單檔就跑得完。但要換的只有
@@ -41,7 +46,7 @@ meta.classifier 會記下是哪一顆問的，兩邊的檔案不會認錯。deep
    同名函式（都照 https://docs.typesafe.ai/confidence），所以算出來的值和
    H2OClassifier 回傳的 .confidence 一致，不需要換。
 
-2. 多問題同一個請求：deep20.py 的 ask() 一次問 model_route + coding + 整組 battery，
+2. 多問題同一個請求：deep20.py 的 ask() 一次問 model_route + mode + coding + 整組 battery，
    shim 支援一個請求多個問題（還會共用 state 的 prefix cache），所以 --isolate 與否都正常。
 
 ---- noul_floor 的影響，看門檻 ----
@@ -57,12 +62,19 @@ serve_config.json 的 noul_floor 改成 0（0 等於關掉），改完重啟 shi
     python ~/models/h2o-lightning-4b/h2o_lightning_shim.py --vllm http://127.0.0.1:8000 --port 8741
 """
 
+import argparse
+import json
 import os
 import sys
 
-import deep20
+# import deep20 時 llm_models.qwen() 就會讀 DASHSCOPE_API_KEY；`mode` 只問 h2o、不呼叫 LLM，所以沒設也能跑
+if sys.argv[1:2] == ["mode"]:
+    os.environ.setdefault("DASHSCOPE_API_KEY", "unused-by-mode")
 
-from classifier_h2o import H2O_MODEL, H2OClassifier
+import deep20  # noqa: E402
+from langchain_core.messages import HumanMessage  # noqa: E402
+
+from classifier_h2o import H2O_MODEL, H2OClassifier  # noqa: E402
 
 RESULT_DIR = os.path.join(deep20.HERE, "deep20_h2o_results")
 
@@ -126,7 +138,65 @@ def build_result(d, args, rows, prompts):
 deep20.build_result = build_result
 
 
+# ---- `python deep20_h2o.py mode`：只問 deep20.TRIAGE_QUESTIONS["mode"] 那一題（chat / agent） ----
+# 不呼叫 LLM、不寫 result，只是看 h2o 對一個 query 判 chat 還是 agent。
+MODE_EXAMPLES = [
+    # (使用者 query, 應該判成哪個 mode)
+    # skill-queries/pptx.json 的 pptx-01：讀一份文件、產出一份 7 頁簡報 → agent
+    ("Can you take my executive summary doc and turn it into a crisp 7-slide investor pitch deck "
+     "with key market stats and our business model?", "agent"),
+    # pptx-02：打開一個 .pptx 改內容 → agent
+    ("Please open q3_marketing_report.pptx and update slide 4's conversion rates with the new numbers "
+     "from our spreadsheet.", "agent"),
+    ("幫我把 report.docx 轉成 PDF，然後寄給我的主管。", "agent"),
+    # 一則文字回覆就答完了 → chat（包括在回覆裡寫一小段程式）
+    ("What is the capital of Australia?", "chat"),
+    ("Write a Python function that returns the n-th Fibonacci number.", "chat"),
+    ("請問台灣最高的山是哪一座？", "chat"),
+]
+
+
+def cmd_mode(argv):
+    ap = argparse.ArgumentParser(
+        prog="deep20_h2o.py mode",
+        description=f"只問 {H2O_MODEL} 一題 mode（chat / agent），印出判斷和 P(agent)")
+    ap.add_argument("query", nargs="*", help="要判斷的使用者 query；不給就跑內建的幾題（MODE_EXAMPLES）")
+    ap.add_argument("--skill", help="改讀 skill-queries/<名稱>.json 每個 scenario 的 user_query（例如 pptx）")
+    ap.add_argument("--expect", choices=("chat", "agent"), help="這些 query 應該判成哪個 mode（印 ✓ / ✗）")
+    a = ap.parse_args(argv)
+
+    if a.skill:
+        path = os.path.join(os.path.dirname(deep20.SKILL), f"{a.skill}.json")
+        with open(path, encoding="utf-8") as f:
+            cases = [(s["user_query"], a.expect) for s in json.load(f)["scenarios"]]
+    elif a.query:
+        cases = [(q, a.expect) for q in a.query]
+    else:
+        cases = MODE_EXAMPLES
+
+    question = {"mode": deep20.TRIAGE_QUESTIONS["mode"]}
+    # state 和 deep20.ask() 第 1 步送的一樣（HumanMessage），答案才和整條跑時一致
+    responses = H2OClassifier(timeout=600).batch(
+        [{"state": HumanMessage(q), "questions": question} for q, _ in cases],
+        config={"max_concurrency": 8},
+    )
+    got = {"chat": 0, "agent": 0}
+    wrong = 0
+    for (q, want), r in zip(cases, responses):
+        ans = r.choices["mode"]
+        got[ans.choice] += 1
+        mark = " " if want is None else ("✓" if ans.choice == want else "✗")
+        wrong += mark == "✗"
+        print(f"{mark} {ans.choice:<5}  P(agent)={ans.probabilities['agent']:.3f}  {q[:110]}")
+    graded = sum(want is not None for _, want in cases)
+    print(f"\n{len(cases)} 題：chat {got['chat']}、agent {got['agent']}"
+          + (f"；判對 {graded - wrong}/{graded}" if graded else ""))
+    return 1 if wrong else 0
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["mode"]:
+        sys.exit(cmd_mode(sys.argv[2:]))
     name = _take_guard_policy(sys.argv)
     if name is not None:
         if name not in deep20.POLICIES:

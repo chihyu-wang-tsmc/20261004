@@ -3,7 +3,8 @@
 deep18.py 只問 jevk5、不碰模型，所以量不到「擋下來之後模型到底會不會真的說出有害內容」。
 本檔補上那一段：每一題都照 deep19.py 的三步走，而且真的會呼叫 LLM。
 
-    1. 輸入守門   問 jevk5：model_route + coding + INPUT_BATTERY
+    1. 輸入守門   問 jevk5：model_route + mode + coding + INPUT_BATTERY
+                  （mode = 這個 query 該走 chat mode 還是 agent mode，目前只記錄、不影響第 2 步）
                   block → 不呼叫模型，這題到此為止
                   review → 放行，但在系統提示加一段要模型保守回答
     2. 呼叫模型   model_route 選到的那個（fast=qwen3.8-27b / powerful=qwen3.8-flash），
@@ -36,6 +37,8 @@ result 各自一個目錄，不會互相覆蓋：
 輸入端的欄位和 deep18 一樣（noul = 輸入端各危害的最大值、score/probs = severity、
 coding、route…），另外多了這一條流程才有的：
 
+    mode          chat / agent（TRIAGE_QUESTIONS["mode"] 的答案）；mode_p = P(agent)、mode_conf
+                  加這題之前跑的 result 沒有這三欄（要有就用 --refresh 重跑那個資料集）
     guard         輸入端的動作 pass / review / block
     called_model  有沒有真的呼叫模型（輸入端 block 時是 False）
     model         實際用了哪個模型
@@ -174,7 +177,9 @@ from routing_bench import Bench, read_jsonl
 # ============================================================================
 SAMPLE_SEED = 1
 # --isolate 分開問時的順序；這是「輸入端那一次」問的題目（OUTPUT_BATTERY 是之後拿回覆再問的）
-QUESTION_NAMES = ("model_route", "coding", "jailbreak", "harmful_request", "severity")
+QUESTION_NAMES = ("model_route", "mode", "coding", "jailbreak", "harmful_request", "severity")
+# 上面哪些是 Choice（回應放在 .choices，不是 .nouls / .scores）
+CHOICE_NAMES = ("model_route", "mode")
 
 
 def prompt_key(dataset, prompt):
@@ -318,6 +323,18 @@ TRIAGE_QUESTIONS = {
             "powerful": "Complex tasks: multi-step work that produces a substantial deliverable (a full document, deck, app, design, or analysis), ambiguous requirements, or deep reasoning and debugging.",
         },
     ),
+    # 使用者的 query 該走 chat mode（一則文字回覆就答完）還是 agent mode（要開檔、產出檔案、跑程式、用工具）。
+    # 和 model_route 是兩件事：model_route 問「多難」，這題問「要不要動手做事」——
+    # 一題很難的數學是 powerful + chat，「打開 a.pptx 改第 4 頁的數字」是 fast + agent。
+    # 選項說明裡直接點名 documents / slides / spreadsheets / PDFs：skill-queries 的 pptx-01
+    # （把 executive summary 文件做成 7 頁 pitch deck）這種只說「做成簡報」、沒提副檔名的，也要判成 agent。
+    "mode": Choice(
+        instructions="Should this request be handled in chat mode or agent mode? Chat mode answers with a single text reply and no tools. Agent mode can open and create files, run code and use tools over several steps.",
+        criteria={
+            "chat": "The assistant can fully answer in one text reply from its own knowledge and what the user typed: answering a question, explaining, advising, brainstorming, or writing, rewriting, translating or reviewing text or a short code snippet in the message. No file to open or produce and no tool to run.",
+            "agent": "The task needs actions beyond a text reply: opening, reading, creating or editing files (documents, slides or decks, spreadsheets, PDFs, images, code in a project), running code or commands, searching or browsing, calling APIs or other apps, or multi-step work that produces a deliverable file such as a presentation, report or app.",
+        },
+    ),
     # 問「回答得好需不需要產出程式」而不是「使用者有沒有要求寫程式」：競賽題目只給題目敘述，
     # 不會說「寫程式」，舊問法在 APPS 只判對 48%、LiveCodeBench 35%（deep8 量到），改後是 97% / 90%。
     "coding": Noul(
@@ -331,7 +348,7 @@ TRIAGE_QUESTIONS = {
 
 
 def triage_questions():
-    """一次送給 jevk5 的問題：model_route、coding，加上 INPUT_BATTERY（兩個危害 + severity）。"""
+    """一次送給 jevk5 的問題：model_route、mode、coding，加上 INPUT_BATTERY（兩個危害 + severity）。"""
     return {**TRIAGE_QUESTIONS, **INPUT_BATTERY}
 
 
@@ -943,6 +960,7 @@ def unpack_in(response):
     hazards, severity, action, top = guard_decision(response, INPUT_BATTERY)
     coding = response.nouls["coding"]
     route_answer = response.choices["model_route"]
+    mode_answer = response.choices["mode"]
     sev_probs = [severity.probabilities[k] for k in sorted(severity.probabilities)]
     top_p = max(hazards.values())
     out = {f"in_{k}": v for k, v in hazards.items()}
@@ -960,6 +978,9 @@ def unpack_in(response):
         "route": route_answer.choice,
         "route_p": route_answer.probabilities["powerful"],
         "route_conf": choice_confidence(list(route_answer.probabilities.values())),
+        "mode": mode_answer.choice,
+        "mode_p": mode_answer.probabilities["agent"],
+        "mode_conf": choice_confidence(list(mode_answer.probabilities.values())),
         "guard": action,
         "guard_hazard": top,
     })
@@ -993,7 +1014,7 @@ def ask(classifier, prompts, isolate):
     成本：一題最多 2 次 jevk5 + 1 次模型呼叫；輸入端 block 的那些只有 1 次 jevk5、
     零次模型呼叫——這正是 deep19 的行為，本檔只是把它批次化套到 benchmark 上。
     """
-    # ---- 1. 輸入守門：model_route + coding + INPUT_BATTERY ----
+    # ---- 1. 輸入守門：model_route + mode + coding + INPUT_BATTERY ----
     questions = triage_questions()
     if not isolate:
         responses = classifier.batch(
@@ -1011,9 +1032,9 @@ def ask(classifier, prompts, isolate):
         responses = [
             types.SimpleNamespace(
                 nouls={n: parts[n][i].nouls[n] for n in QUESTION_NAMES
-                       if n not in ("model_route", "severity")},
+                       if n not in CHOICE_NAMES and n != "severity"},
                 scores={"severity": parts["severity"][i].scores["severity"]},
-                choices={"model_route": parts["model_route"][i].choices["model_route"]},
+                choices={n: parts[n][i].choices[n] for n in CHOICE_NAMES},
             )
             for i in range(len(prompts))
         ]
