@@ -27,6 +27,10 @@ deep20_coding_report/roc*.png
 deep20_coding_report_h2o/tables*.xlsx
 deep20_coding_report_h2o/roc*.png
 
+# deep20_mode_report_h2o.py 的 Excel 和 [M5] 的門檻曲線，每次跑都會重生（deep20_mode_h2o_results/ 是 h2o 問出來的答案，要留）
+deep20_mode_report_h2o/tables*.xlsx
+deep20_mode_report_h2o/roc*.png
+
 # hierarchical_*.py 的回答快取，每次跑都能重生（CPC zip、Shopify categories.txt、MeSH desc2026.zip 有入版控，不用再下載）
 hierarchical_cpc/json_cache.*
 hierarchical_cpc_h2o/json_cache.*

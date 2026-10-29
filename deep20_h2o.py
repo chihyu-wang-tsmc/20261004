@@ -15,6 +15,8 @@ jevk5 換成 H2O-Lightning-4B。所有的 CLI 參數（run / status / --only / -
     python deep20_h2o.py mode                                  # 內建幾題（pptx-01 那題應該是 agent）
     python deep20_h2o.py mode "幫我把 report.docx 轉成 PDF"     # 自訂 query
     python deep20_h2o.py mode --skill pptx --expect agent      # skill-queries/pptx.json 的 30 題
+    # 整批算準確度（skill-queries/ 全當 agent、chat/ 全當 chat）：見 deep20_mode_report_h2o.py
+    python deep20_mode_report_h2o.py run && python deep20_mode_report_h2o.py report
 
 ---- 為什麼是覆寫 deep20 的三個全域，而不是整檔複製 ----
 
