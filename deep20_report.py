@@ -105,6 +105,8 @@ router 看不到 model 身分，route_p 和升級順序對每個 fast 都一樣�
                                             0.9/0.7/0.5/0.3/0.1）。色相 = bench、深淺 = fast
                                             （只有這張是這樣配，圖例一條線一項）
         bench_overlay_norm.png              同上，Y 改成「補回 oracle 差距的比例」
+        bench_overlay_cost.png              同 bench_overlay，X 軸下方每條線各多一列 $ 每千題
+                                            （該 fast + powerful 的實際花費，顏色 = 那條線）
         curve_tau_axis[_<bench>]_explained.png / _explained_chart.png / _explained.txt
                                             說明版（圖上標 1–5、右邊逐項推導）與拆開的圖／文字
         tables.xlsx                         各 fast × 各 bench 的摘要、作答覆蓋、曲線、逐題資料
@@ -2685,7 +2687,10 @@ def fast_shades(base, n, c):
     return [tuple(rgb + (bg - rgb) * (MAX_SHADE * i / max(n - 1, 1))) for i in range(n)]
 
 
-def fig_multi_bench_overlay(by_bench, models, c, path, y="acc"):
+COST_ROW_PT = 15   # cost_axes 版每一列 $ 刻度佔的高度（點）
+
+
+def fig_multi_bench_overlay(by_bench, models, c, path, y="acc", cost_axes=False):
     """多 fast 圖 4：每個 bench 每個 fast 一條線，全部同一組 X / Y 軸，每條線標自己的 τ。
 
     by_bench 是 {bench: {fast: analyse()}}，和 fig_multi_per_bench 吃的同一份。
@@ -2701,6 +2706,12 @@ def fig_multi_bench_overlay(by_bench, models, c, path, y="acc"):
         各自是多少在 tables.xlsx 的「摘要_fast比較」（oracle 天花板 − 全送 fast 正確率）。
 
     這張不畫 oracle、不畫天花板箭頭、X 也不標 $：理由同 fig4_bench_overlay。
+
+    cost_axes=True（bench_overlay_cost）：X 軸下方每條線各加一列 $ 每千題的刻度，
+        把同一個呼叫比例換算成「該 fast + powerful」的實際花費（同一個量、不同單位）。
+        $ 不能共用一列：每個 (bench, fast) 的 token 用量和單價都不同，而且升級順序是照
+        route_p 排的，$ 和呼叫比例不是等比例 —— 所以每列的刻度位置一樣，數字各自不同。
+        x = 100% 是全送 powerful，同一個 bench 的幾列在那裡會是同一個 $。
     """
     import matplotlib.pyplot as plt
     names = list(by_bench)
@@ -2742,6 +2753,37 @@ def fig_multi_bench_overlay(by_bench, models, c, path, y="acc"):
     ax.set_ylabel("share of oracle gap recovered (own gap per line)" if y == "norm"
                   else "end-to-end accuracy", color=c["ink2"])
 
+    legend_dy = 0.0   # cost_axes 版的圖例要再往下移幾點
+    if cost_axes:
+        ticks = np.linspace(0, 1, 6)
+        ax.set_xticks(ticks)
+        ax.set_xlabel("")
+        row0 = 22     # 第一列 $ 和主刻度（0%…100%）之間的距離（點）
+        k = 0
+        for m in models:
+            for b in names:
+                r = by_bench[b][m]["router"]
+                dollars = np.interp(ticks, r["call"], r["cost"]) * 1000
+                off = row0 + k * COST_ROW_PT
+                sec = ax.secondary_xaxis("bottom")
+                sec.spines["bottom"].set_position(("outward", off))
+                sec.spines["bottom"].set_visible(False)
+                sec.set_xticks(ticks)
+                sec.set_xticklabels([f"${d:,.2f}" for d in dollars])
+                sec.tick_params(axis="x", length=0, pad=1, labelsize=8, colors=col[(b, m)])
+                ax.annotate(f"{b.upper()}  {m} + {ROUTE_POWERFUL}", xy=(1, 0),
+                            xycoords="axes fraction", xytext=(14, -off - 1),
+                            textcoords="offset points", ha="left", va="top",
+                            fontsize=8, color=col[(b, m)], annotation_clip=False)
+                k += 1
+        last = row0 + (k - 1) * COST_ROW_PT
+        ax.annotate("powerful call rate (top row) / $ per 1k items, model cost only "
+                    "(one row per line: that fast + powerful)",
+                    xy=(0.5, 0), xycoords="axes fraction", xytext=(0, -last - 16),
+                    textcoords="offset points", ha="center", va="top",
+                    fontsize=10, color=c["ink2"], annotation_clip=False)
+        legend_dy = last + 30
+
     # 圖例：一條線一項，標出它是哪個 bench 的哪個 fast，顏色就是線上那個深淺。
     # matplotlib 是直欄填的且每欄等高，所以每個 fast 一欄（欄內四個 bench），
     # 記號另外補成一欄 —— 要每欄一樣高才排得齊，不足的補空白項目。
@@ -2764,8 +2806,14 @@ def fig_multi_bench_overlay(by_bench, models, c, path, y="acc"):
                                       else f"{b.upper()}  {m}  n = {n_b}"))
         handles += [blank() for _ in range(rows - len(names))]
     handles += [*mark_h, *(blank() for _ in range(rows - len(mark_h)))]
-    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.10),
-              ncols=len(models) + 1, labelcolor=c["ink2"], fontsize=8.5)
+    if cost_axes:   # 圖例接在最後一列 $ 和軸標題下面（用點來量，不受圖高影響）
+        from matplotlib.transforms import ScaledTranslation
+        anchor = dict(bbox_to_anchor=(0.5, 0), bbox_transform=ax.transAxes + ScaledTranslation(
+            0, -legend_dy / 72, fig.dpi_scale_trans))
+    else:
+        anchor = dict(bbox_to_anchor=(0.5, -0.10))
+    ax.legend(handles=handles, loc="upper center", ncols=len(models) + 1,
+              labelcolor=c["ink2"], fontsize=8.5, **anchor)
 
     # τ 一定要在 tight_layout 之後畫（理由同 fig4_bench_overlay）。
     # models 放外圈：--fast 先給的那個先佔標籤位置，和「依序配色」同一個優先順序。
@@ -3082,6 +3130,9 @@ def cmd_report_multi_fast(args):
     for yv, tag in (("acc", ""), ("norm", "_norm")):
         fig_multi_bench_overlay(by_bench, models, c,
                                 os.path.join(out, f"bench_overlay{tag}{sfx}.png"), y=yv)
+    # 同 bench_overlay，X 軸下方每條線多一列 $ 每千題（該 fast + powerful）
+    fig_multi_bench_overlay(by_bench, models, c,
+                            os.path.join(out, f"bench_overlay_cost{sfx}.png"), cost_axes=True)
     for b, ma in by_bench.items():
         fig_multi_curve(ma, models, c, os.path.join(out, f"curve_tau_axis_{b}{sfx}.png"),
                         title=f"{b.upper()}　n = {ma[models[0]]['n']}")
