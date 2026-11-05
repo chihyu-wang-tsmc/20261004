@@ -109,8 +109,6 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
 ![](image:/api/v1/fetchImage/oP2mxoCiyK/TURJdBdkM8/2)
 參考:[https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171](https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171[?])
 
-> ⚠️ 原始檔每筆固定 14 段 reference，這裡只辨識出 13 段。照片 9 的 Case-20231002-00171 連結被手機縮成「f1...」，缺少的那段很可能被藏在這裡（Chunk 9 與 Chunk 10 之間）。
-
 **Chunk 10**（照片 9–11）
 - Case Background
   user 覺得 STR Cond Table 有資料錯誤
@@ -121,9 +119,15 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
   Step 1: 如果 Order Status不符合規則，請 user調整
   Step 2: 若單子的時間沒有問題的話，系統會有 job 將此 PDMP 單抓入系統，有可能只是錯過班車。[系統邏輯參考 (Check Pdmp 功能說明)](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#o3fgOaWOLBv8yAv2nbpEl)
   Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#lz-3Mv_mQaDnw9eQFc3aP)，是否有出現 user 所發出的 PDMP order 包含的 lot 和實驗站點和 wafer。如果有，那就是已經透過 iChange 綁定，那張 PDMP order 就不會出現在 Unassigned PDMP Order 的 table 中。
+**Chunk 11**（照片 10–11 之間被遮住，依「第0列_完整內容.md」補上；內容與 Chunk 13 相同）
+4. PDMP 單是透過 iChange 開的，但是有 comment 不在行控裡面
+- Solution
+  Step 1: 如果 Order Status不符合規則，請 user調整
+  Step 2: 若單子的時間沒有問題的話，系統會有 job 將此 PDMP 單抓入系統，有可能只是錯過班車。[系統邏輯參考 (Check Pdmp 功能說明)](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#o3fgOaWOLBv8yAv2nbpEl)
+  Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#lz-3Mv_mQaDnw9eQFc3aP)，是否有出現 user 所發出的 PDMP order 包含的 lot 和實驗站點和 wafer。如果有，那就是已經透過 iChange 綁定，那張 PDMP order 就不會出現在 Unassigned PDMP Order 的 table 中。
   Step 4: 比較 user 提供的 iChange 畫面的 Comment ID，和在行控 Comment Table 指令列出的所有 comment 的 ID 是否一致。如果不一致: 請 user 找 QM 把不在行控的 comment 做 recomment，這樣才能註冊到行控，todo列出的 STR comments 會新增一筆，從新增的 comment 按 Cond Table 就可看到 PDMP order 的 lot 和實驗站點
 
-**Chunk 11**（照片 11–12）
+**Chunk 12**（照片 11–12）
 - PDMP 訂單上半部分的 SplitOpNo / MergeOpNo 為註冊 Wafer Base 的 LotAction 訂單來進行
 - 若 Lot 身上的所有的 Wafer 都用來開 Runcard (單一 R/C Group)，這種情況是不會在 SplitOpNo / MergeOpNo 註冊 Lot Action 訂單
 - 當 Wafer 在 Split 站點完成拆批後，若於抵達實驗站點前又被 Merge，則當抵達實驗站點時，PDMP 系統亦會註冊 LotAction 訂單將 Wafer 再次拆出並註冊 Runcard，而其 Merge 站點亦是 PDMP 訂單上所設置的 Merge 站點
@@ -133,7 +137,7 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
 
 ***
 
-**Chunk 12**（照片 12–13）
+**Chunk 13**（照片 12–13）
 4. PDMP 單是透過 iChange 開的，但是有 comment 不在行控裡面
 - Solution
   Step 1: 如果 Order Status不符合規則，請 user調整
@@ -141,7 +145,7 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
   Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#lz-3Mv_mQaDnw9eQFc3aP)，是否有出現 user 所發出的 PDMP order 包含的 lot 和實驗站點和 wafer。如果有，那就是已經透過 iChange 綁定，那張 PDMP order 就不會出現在 Unassigned PDMP Order 的 table 中。
   Step 4: 比較 user 提供的 iChange 畫面的 Comment ID，和在行控 Comment Table 指令列出的所有 comment 的 ID 是否一致。如果不一致: 請 user 找 QM 把不在行控的 comment 做 recomment，這樣才能註冊到行控，todo列出的 STR comments 會新增一筆，從新增的 comment 按 Cond Table 就可看到 PDMP order 的 lot 和實驗站點
 
-**Chunk 13**（照片 13–14）
+**Chunk 14**（照片 13–14）
 ##### Description: PDMP 單種有另外對於 user 是否有 Siview 權限作卡關
 ##### Root Cause: 主要原因是無權限
 Action:
