@@ -218,9 +218,89 @@ NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard
 - 在 Runcard 站點到跳站站點之間不可有 Future Hold 存在
 - Foup 不能已 Load 到機台 (有的話請先收貨)
 
-**Chunk 5**（照片 19–）
+**Chunk 5**（照片 19–20）
 - Step0. 您必須知道的事 (請閱讀完以下注意事項後，在開始 Release WFRC Hold 操作步驟)
 - 可以手動解 WFRC Hold 的情境：原則上當 Lot 已進去過 Runcard Route 就不允許手動解 WFRC，但以下情況可請 PE/PID/RD 手動解除 WFRC Hold
 - Runcard 已退件
-- 繼承到母批的 WFRC，…
-- （照片 19 到此截斷，接續下一張）
+- 繼承到母批的 WFRC，但子批不執行 Runcard (Siview 批貨資訊的 Runcard 按鈕點進去顯示無 Runcard)
+- Lot 已到站，Runcard 已簽完，但 Runcard Condition 尚未拆批，Lot 停留在 Main Route 實驗站點
+- Lot 需先做 merge/rework (解完 WFRC，處理完後記得要再設回去)
+- 執行「Runcard 取消」操作時，Lot 剛好站在 Sorter Route 上 (此情境已知是無法自動將 WFRC 轉 RCCL，只能手動解 WFRC)
+- Step1. 請問 Lot 身上是否有複數存在的 WFRC Hold？(如下圖，一個是 user 手動設上，另一個是系統設上)
+  ![一個是 user 手動設上，另一個是系統設上](image:/api/v1/fetchImage/G2U6KPF69X/TURVjw7Ugr/2)
+- 是， 請執行以下動作
+
+**Chunk 6**（照片 20–22）
+- ECCP_LeadingChar=P1
+- TECN_LeadingChar=T1
+- STR_LeadingChar=S1
+- EN_LeadingChar=P
+- LH_LeadingChar=E1
+- ECN_Gating_Status=approving // effective // effective, Implement // effective, Not Implement
+- ECCP_Gating_Status=experimenting // concluding// effective
+- TECN_Gating_Status=approving // effective // effective, Implement
+- STR_Gating_Status=approving // effective
+- F15A/B
+- ECN_LeadingChar=E1
+- ECCP_LeadingChar=P1
+- TECN_LeadingChar=T1
+- STR_LeadingChar=S1
+- EN_LeadingChar=T
+- LH_LeadingChar=F1
+- ECN_Gating_Status=approving // effective // effective, Implement // effective, Not Implement
+- ECCP_Gating_Status=experimenting // concluding
+- TECN_Gating_Status=approving // effective // effective, Implement
+- STR_Gating_Status=approving // effective
+- F18A/B
+- ECN_LeadingChar=E1
+- ECCP_LeadingChar=P1
+- TECN_LeadingChar=T1
+- STR_LeadingChar=S1
+- EN_LeadingChar=U ->18A
+  EN_LeadingChar=U ->18B
+- LH_LeadingChar=G1
+
+**Chunk 7**（照片 22）
+- 問題描述：「Runcard 完成」時，出現「CSRCC504: 0011320E: More than one [WFRC] Hold records.有超過一個以上的Hold存在,請工程師先處理其它多餘的Hold,只留下正確且唯一的 WFRC Hold,並再做一次 RC Complete.」錯誤
+  ![「Runcard 完成」時，出現「CSRCC504: 0011320E: More than one [WFRC] Hold records.有超過一個以上的Hold存在,請工程師先處理其它多餘的Hold,只留下正確且唯一的 WFRC Hold,並再做一次 RC Complete.」錯誤](image:/api/v1/fetchImage/HbCF6CCroP/TURVCmPLvn/2)
+- 解決步驟：當執行「Runcard 完成」，跳出此錯誤訊息後，請直接關閉此訊息，便會開始 Runcard 逃生門程序。請詳見「[Runcard 逃生門](https://tkms.digwork.tw.ent.tsmc.com/pages/HbqPQDWMPV#4OHhM9_EEC5_SCSvO5rSv)」小節內容
+
+***
+
+**Chunk 8**（照片 22–23）
+- 問題描述：PDMP 簽核完成後，無法產生 Runcard ID，遭遇「Fail reason: RUNCARD(lot) book lot action fail due to [MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Failed to get new RunCard ID].」錯誤
+- 可能原因：當下 RC Domain Service 異常
+- 解決步驟：User 重新 [Re-Trigger PDMP 訂單](https://tkms.digwork.tw.ent.tsmc.com/pages/H4JaALf6pM#7FI76CtytzOVyVaeoZR2K)，如果狀況未解決則請報案 3999
+
+***
+
+**Chunk 9**（照片 23）
+- 問題描述：「Runcard 取消」時，出現「WFRC hold不存在。請先hold回 WFRC再執行Runcard取消」錯誤
+- 可能原因：欲執行 Runcard 完成 / 取消時， 需要 Lot 身上有 WFRC Hold 才可以進行
+- 解決步驟：請 user 自行為 Lot 設置 WFRC Hold，再進行 Runcard 完成 / 取消操作
+- 參考資料 :
+- [https://it-case-center.itsd.tsmc.com/case/Case-20251001-01789](https://it-case-center.itsd.tsmc.com/case/Case-20251001-01789 "https://it-case-center.itsd.tsmc.com/case/Case-20251001-01789")
+
+***
+
+**Chunk 10**（照片 23–24）
+- F18A/B
+- ECN_LeadingChar=E1
+- ECCP_LeadingChar=P1
+- TECN_LeadingChar=T1
+- STR_LeadingChar=S1
+- EN_LeadingChar=U ->18A
+  EN_LeadingChar=U ->18B
+- LH_LeadingChar=G1
+- ECN_Gating_Status=approving // effective // effective, Implement // effective, Not Implement
+- ECCP_Gating_Status=experimenting // concluding
+- TECN_Gating_Status=approving // effective // effective, Implement
+- STR_Gating_Status=approving // effective
+
+***
+
+**Chunk 11**（照片 24–）
+- 問題描述：「Runcard 完成」時，出現「other hold:BRER 不能做 Runcard Complete」錯誤
+- 可能原因：Lot 當下有存在除了 WFRC 以外的 Hold (例如：BRER)
+- 解決步驟：請 user 將 WFRC 以外的 Hold Release 後，再做一次 Runcard 完成…
+- （照片 24 到此截斷，接續下一張）
