@@ -299,8 +299,63 @@ NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard
 
 ***
 
-**Chunk 11**（照片 24–）
+**Chunk 11**（照片 24–25）
 - 問題描述：「Runcard 完成」時，出現「other hold:BRER 不能做 Runcard Complete」錯誤
 - 可能原因：Lot 當下有存在除了 WFRC 以外的 Hold (例如：BRER)
-- 解決步驟：請 user 將 WFRC 以外的 Hold Release 後，再做一次 Runcard 完成…
-- （照片 24 到此截斷，接續下一張）
+- 解決步驟：請 user 將 WFRC 以外的 Hold Release 後，再做一次 Runcard 完成
+- 參考資料 :
+- [https://it-case-center.itsd.tsmc.com/case/Case-20250921-00307](https://it-case-center.itsd.tsmc.com/case/Case-20250921-00307 "https://it-case-center.itsd.tsmc.com/case/Case-20250921-00307")
+
+***
+
+**Chunk 12**（照片 25–26）
+- 問題描述： PDMP 開單後，被 Hold ENHL，Memo 為「Reason: RUNCARD(wfr) is sue R/C fail due to [MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Effecti veNo TMPU30-0016 is wrong format for LH」
+  ![PDMP 開單後，被 Hold ENHL，Memo 為「Reason: RUNCARD(wfr) is sue R/C fail due to [MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Effecti veNo TMPU30-0016 is wrong format for LH」](image:/api/v1/fetchImage/JmocM4tUNc/TURYATCFTn/2)
+- 可能原因：各廠區有固定的有效文件字頭代碼，須符合才能開單
+- 例如：F15 設定 LH_LeadingChar = F1，就要用 F1 開頭的有效文件開單
+  ![F15 設定 LH_LeadingChar = F1，就要用 F1 開頭的有效文件開單](image:/api/v1/fetchImage/Jmn9D4XSBR/TURYATCFTn/2)
+- 各廠設定如下
+- F12：目前沒卡關
+- F14A/B
+- ECN_LeadingChar=E1
+- ECCP_LeadingChar=P1
+- TECN_LeadingChar=T1
+- STR_LeadingChar=S1
+- EN_LeadingChar=P
+- LH_LeadingChar=E1
+- ECN_Gating_Status=approving // effective // effective, Implement // effective, Not Implement
+
+**Chunk 13**（照片 26–27）
+- 問題描述： Runcard Skip Fail，出現 RCLF Hold (跳站中有人設置未來暫置) 該如何排除?
+  ![Runcard Skip Fail，出現 RCLF Hold 該如何排除?](image:/api/v1/fetchImage/Hbt4r8L2op/TUR43J5bmP/2)
+- 解決步驟：請將 RCLF Hold Memo 寫的 Future Hold 先解掉，再做「Runcard 完成」即可
+  ![請將 RCLF Hold Memo 寫的 Future Hold 先解掉](image:/api/v1/fetchImage/Hbuhcn49Ek/TUR43J5bmP/2)
+
+***
+
+**Chunk 14**（照片 27–28）
+- 問題描述： PDMP 執行 fail，Please solve fail reason then retrigger PDMP or re-issue PDMP. Fail reason: RUNCARD(wfr) book lot action fail due to [MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.0011481E: Object N9YV24.2K OwnerFab do
+  ![PDMP 執行 fail，Please solve fail reason then retrigger PDMP or re-issue PDMP. Fail reason: RUNCARD(wfr) book lot action fail due to [MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.0011481E: Object N9YV24.2K OwnerFab do](image:/api/v1/fetchImage/JJXLLnMkvr/TURYRrWCSK/2)
+- 可能原因：產權不符
+- 解決步驟：
+- 請先找[廠區 MEP ](https://it.tsmc.com.tw/isp/zh/omi-platform/super-giga-omi-tag-issue-sop/) 幫忙澄清產權是否正確
+- 參考資料 :
+- [https://it-case-center.itsd.tsmc.com/case/Case-20250923-00713](https://it-case-center.itsd.tsmc.com/case/Case-20250923-00713 "https://it-case-center.itsd.tsmc.com/case/Case-20250923-00713")
+
+***
+
+（第 2 筆結束）
+
+---
+
+## 第 3 筆（照片 28）
+
+### query
+[報案]ECP2 報表 E-runcard 出現錯誤訊息 " You don't have privilege to access"
+
+### ground_truth_chunk
+- 問題描述： 開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤
+  ![開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤](image:/api/v1/fetchImage/PFby6dctsF/TUR7AVKTPn/2)
+- 可能原因：欠缺「RuncardMaintenanceEntrance」此 A4 2.0 功能群組權限
+- 解決步驟：
+- （照片 28 到此結束；下方另附一張文件截圖，字太小無法辨識。reference_chunks 未拍到）
