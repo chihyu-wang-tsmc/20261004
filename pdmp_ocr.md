@@ -109,7 +109,7 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
 ![](image:/api/v1/fetchImage/oP2mxoCiyK/TURJdBdkM8/2)
 參考:[https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171](https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171[?])
 
-**Chunk 10**（照片 9–10）
+**Chunk 10**（照片 9–11）
 - Case Background
   user 覺得 STR Cond Table 有資料錯誤
 - Root Cause
@@ -118,5 +118,67 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
   PDMP 與STR CondTable的關係請參考[Cond Table功能說明](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#7BDg00dS2y0aK-gLuM-ib)。解決方式可以參考 Case-3: [Common] FCCB 找不到 PDMP 單
   Step 1: 如果 Order Status不符合規則，請 user調整
   Step 2: 若單子的時間沒有問題的話，系統會有 job 將此 PDMP 單抓入系統，有可能只是錯過班車。[系統邏輯參考 (Check Pdmp 功能說明)](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#o3fgOaWOLBv8yAv2nbpEl)
-  Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#[?]3Mv_mQaDnw9eOFc3aP)，是否有出現 user 所發出…
-- （照片 10 到此截斷，接續下一張）
+  Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#lz-3Mv_mQaDnw9eQFc3aP)，是否有出現 user 所發出的 PDMP order 包含的 lot 和實驗站點和 wafer。如果有，那就是已經透過 iChange 綁定，那張 PDMP order 就不會出現在 Unassigned PDMP Order 的 table 中。
+  Step 4: 比較 user 提供的 iChange 畫面的 Comment ID，和在行控 Comment Table 指令列出的所有 comment 的 ID 是否一致。如果不一致: 請 user 找 QM 把不在行控的 comment 做 recomment，這樣才能註冊到行控，todo列出的 STR comments 會新增一筆，從新增的 comment 按 Cond Table 就可看到 PDMP order 的 lot 和實驗站點
+
+**Chunk 11**（照片 11–12）
+- PDMP 訂單上半部分的 SplitOpNo / MergeOpNo 為註冊 Wafer Base 的 LotAction 訂單來進行
+- 若 Lot 身上的所有的 Wafer 都用來開 Runcard (單一 R/C Group)，這種情況是不會在 SplitOpNo / MergeOpNo 註冊 Lot Action 訂單
+- 當 Wafer 在 Split 站點完成拆批後，若於抵達實驗站點前又被 Merge，則當抵達實驗站點時，PDMP 系統亦會註冊 LotAction 訂單將 Wafer 再次拆出並註冊 Runcard，而其 Merge 站點亦是 PDMP 訂單上所設置的 Merge 站點
+- 行為上會是 PDMP 系統認到 STHL Hold -> 註冊 LotAction Split/Merge 訂單 (註冊成功後 Lot 身上會有 LPHL Hold) -> 解 STHL Hold -> 再重新設上 STHL Hold -> 等 LotAction 完成 Split 動作 -> PDMP 系統認到 STHL Hold -> 註冊 Runcard & 設置 WFRC Hold
+- Runcard Route 中的拆批行為則依然是交由 RCCS 進行
+  ![PDMP 的 Wafer Base 開單邏輯說明](image:/api/v1/fetchImage/JmdpQvwYuX/TURYATCFTn/2)
+
+***
+
+**Chunk 12**（照片 12–13）
+4. PDMP 單是透過 iChange 開的，但是有 comment 不在行控裡面
+- Solution
+  Step 1: 如果 Order Status不符合規則，請 user調整
+  Step 2: 若單子的時間沒有問題的話，系統會有 job 將此 PDMP 單抓入系統，有可能只是錯過班車。[系統邏輯參考 (Check Pdmp 功能說明)](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#o3fgOaWOLBv8yAv2nbpEl)
+  Step 3: 若單子透過 iChange 開的，並請 user 提供綁定的畫面，檢查 Cond Table 的 [Step 3-1. (From PDMP) Check Lot Experiment Split Table](https://tkms.digwork.tw.ent.tsmc.com/pages/sY7GwxXugj#lz-3Mv_mQaDnw9eQFc3aP)，是否有出現 user 所發出的 PDMP order 包含的 lot 和實驗站點和 wafer。如果有，那就是已經透過 iChange 綁定，那張 PDMP order 就不會出現在 Unassigned PDMP Order 的 table 中。
+  Step 4: 比較 user 提供的 iChange 畫面的 Comment ID，和在行控 Comment Table 指令列出的所有 comment 的 ID 是否一致。如果不一致: 請 user 找 QM 把不在行控的 comment 做 recomment，這樣才能註冊到行控，todo列出的 STR comments 會新增一筆，從新增的 comment 按 Cond Table 就可看到 PDMP order 的 lot 和實驗站點
+
+**Chunk 13**（照片 13–14）
+##### Description: PDMP 單種有另外對於 user 是否有 Siview 權限作卡關
+##### Root Cause: 主要原因是無權限
+Action:
+![](image:/api/v1/fetchImage/pwc4jRJDPV/TURYj9ojhX/2)
+##### PDMP 單種的特殊邏輯:
+My Worklist 有卡 PDMP 單的代簽組織成員需要有 Siview Runcard 權限才能在「Secondary」看得到
+(但 Query Request 目前沒有卡，User 還是可以查詢得到)
+如遇此問題，請 USER 去申請 Siview 權限或找 Sponsor 把他加進 A4 2.0 Role (RUNCARD_SIGNOFF)
+※PDMP Site Sponsor:
+F12: cfwuk 吳政峰
+F14AB/F18AB: hyliaoo 廖宣雅
+F15A/F15B: wyjhuang 莊婉瑜
+SOIC, APOD, AZ (新廠區): hyliaoo 廖宣雅
+相關 CASE:
+[https://it-case-center.itsd.tsmc.com/case/Case-20250914-00607](https://it-case-center.itsd.tsmc.com/case/Case-20250914-00607 "https://it-case-center.itsd.tsmc.com/case/Case-20250914-00607")
+
+（第 1 筆結束）
+
+---
+
+## 第 2 筆（照片 14–）
+
+### query
+NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Set Future Hold (WFRC) fail -- USER已自行處理
+
+### ground_truth_chunk
+- 問題描述：Fab PDMP 設置 WFRC Hold 失敗，STHL Hold Memo 出現「Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Set Future Hold (WFRC) fail.」錯誤
+- 可能原因：該批 Lot 在該站已有 WFRC Hold 存在，並正在執行 Runcard
+  ![](image:/api/v1/fetchImage/LiTEeg13Gg/TUR4TigKJp/2)
+- 解決步驟：
+- 若欲執行 Fab PDMP 訂單，請砍掉 WFRC Hold Memo 上記錄的 Runcard 單
+- 若不執行 Fab PDMP 訂單，請到 ECP Portal 上的 My Experiment，執行 [Fab PDMP 砍單動作](https://tkms.digwork.tw.ent.tsmc.com/pages/H4EqPa6oPH#_Yb3noeV-nHJEx_7yOP-p)
+- 參考資料：
+- [https://it-case-center.itsd.tsmc.com/case/Case-20251028-01152](https://it-case-center.itsd.tsmc.com/case/Case-20251028-01152 "https://it-case-center.itsd.tsmc.com/case/Case-20251028-01152")
+
+***
+
+### reference_chunks
+
+**Chunk 1**（照片 15–）
+- 問題描述： FABPDMP 開單時，出現「Exception: MFGWFR_MANAGERUNCARD-02090001:Create Runcard …
+- （照片 15 到此截斷，接續下一張）
