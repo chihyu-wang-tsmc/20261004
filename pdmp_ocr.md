@@ -109,6 +109,8 @@ opeNo到 skipOpeNo 之間不能有同一支 recipe上在不同站，系統會不
 ![](image:/api/v1/fetchImage/oP2mxoCiyK/TURJdBdkM8/2)
 參考:[https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171](https://it-case-center.titot.f15.tsmc.com/case/Case-20231002-00171[?])
 
+> ⚠️ 原始檔每筆固定 14 段 reference，這裡只辨識出 13 段。照片 9 的 Case-20231002-00171 連結被手機縮成「f1...」，缺少的那段很可能被藏在這裡（Chunk 9 與 Chunk 10 之間）。
+
 **Chunk 10**（照片 9–11）
 - Case Background
   user 覺得 STR Cond Table 有資料錯誤
@@ -163,7 +165,7 @@ SOIC, APOD, AZ (新廠區): hyliaoo 廖宣雅
 ## 第 2 筆（照片 14–）
 
 ### query
-NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Set Future Hold (WFRC) fail -- USER已自行處理
+NT2046077.0Y Fail Reason:(CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Set Future Hold (WFRC) fail -- USER已自行處理
 
 ### ground_truth_chunk
 - 問題描述：Fab PDMP 設置 WFRC Hold 失敗，STHL Hold Memo 出現「Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.Set Future Hold (WFRC) fail.」錯誤
@@ -348,14 +350,47 @@ NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard
 
 ---
 
-## 第 3 筆（照片 28）
+## 第 3 筆（照片 28 + VS Code 截圖第 18–26 行）
 
 ### query
 [報案]ECP2 報表 E-runcard 出現錯誤訊息 " You don't have privilege to access"
 
 ### ground_truth_chunk
-- 問題描述： 開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤
-  ![開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤](image:/api/v1/fetchImage/PFby6dctsF/TUR7AVKTPn/2)
-- 可能原因：欠缺「RuncardMaintenanceEntrance」此 A4 2.0 功能群組權限
-- 解決步驟：
-- （照片 28 到此結束；下方另附一張文件截圖，字太小無法辨識。reference_chunks 未拍到）
+- 問題描述 ： 開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤
+![開啟 ECP Portal 的 e-RunCard 系統後，出現「You don't have privilege to access」錯誤](image:/api/v1/fetchImage/PFby6dctsF/TUR7AVKTPn/2)
+- 可能原因 ： 欠缺 「RuncardMaintenanceEntrance」此 A4 2.0 功能群組權限
+- 解決步驟 ：
+- Step1. 請到 A4 2.0 網站
+-  [https://a4-a4gui.a4.foc.tsmc.com/roleManageGUI/index.html#/ApplyRoleGuide](https://a4-a4gui.a4.foc.tsmc.com/roleManageGUI/index.html#/ApplyRoleGuide "https://a4-a4gui.a4.foc.tsmc.com/roleManageGUI/index.html#/ApplyRoleGuide")
+- Step2. 於「權限申請引導」頁面，Employee ID 欄位輸入工號，Function Group Keyword 欄位輸入「RuncardMaintenanceEntrance」，按下查詢
+- Step3. 選擇搜尋結果下的任一適當的角色進行權限申請
+![於「權限申請引導」頁面，Employee ID 欄位輸入工號，Function Group Keyword 欄位輸入「RuncardMaintenanceEntrance」，按下查詢。選擇搜尋結果下的任一適當的角色進行權限申請](image:[?])
+
+### reference_chunks
+（未拍到）
+
+---
+
+## 第 4 筆（VS Code 截圖第 27–35 行）
+
+### query
+[You don't have privilege to access] e-Runcard 沒有權限
+
+### ground_truth_chunk
+（與第 3 筆相同）
+
+### reference_chunks
+（未拍到）
+
+---
+
+## 第 5 筆（VS Code 截圖第 36 行起）
+
+### query
+AP6B ECP e-Runcard 權限申請, You don't have privilege to access
+
+### ground_truth_chunk
+（與第 3 筆相同，截圖到 Step1 為止）
+
+### reference_chunks
+（未拍到）
