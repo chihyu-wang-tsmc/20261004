@@ -179,6 +179,48 @@ NT2046077.0Y Fail Reason: (CreateRC)MFGWFR_MANAGERUNCARD-02090001:Create Runcard
 
 ### reference_chunks
 
-**Chunk 1**（照片 15–）
-- 問題描述： FABPDMP 開單時，出現「Exception: MFGWFR_MANAGERUNCARD-02090001:Create Runcard …
-- （照片 15 到此截斷，接續下一張）
+**Chunk 1**（照片 15–16）
+- 問題描述： FABPDMP 開單時，出現「Exception: MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.LotID Route: xxx Operation: xxx RunCard(xxx) is already existed」錯誤
+  ![FABPDMP 開單時，出現「Exception: MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.LotID Route: xxx Operation: xxx RunCard(xxx) is already existed」錯誤](image:/api/v1/fetchImage/JmCpmq14RR/TURYATCFTn/2)
+- 可能原因： Lot 身上還有 Runcard 未執行完成 (該未執行完成的 Runcard 亦有可能還處在待簽核階段)
+- 解決步驟：請確認 Runcard 完成 / 取消後再開單 (待簽核狀態的 Runcard 亦須先完成簽退)
+  ![請確認 Runcard 完成 / 取消後再開單 (待簽核狀態的 Runcard 亦須先完成簽退)](image:/api/v1/fetchImage/JFzdspzdJB/TURYATCFTn/2)
+- 參考資料 :
+- [https://it-case-center.itsd.tsmc.com/case/Case-20250914-00470](https://it-case-center.itsd.tsmc.com/case/Case-20250914-00470 "https://it-case-center.itsd.tsmc.com/case/Case-20250914-00470")
+
+**Chunk 2**（照片 17）
+- 問題描述：PDMP Create Runcard 錯誤，「MFGWFR_MANAGERUNCARD-02090001:Create Runcard error.e-R/C is rejected by MFG /Fail reason: RUNCARD(wfr) book lot action fail due to [CYHSUZZB MFG bypass signoff rule is Reject」
+- 可能原因：此 PDMP 訂單欲開立的 RunCard 符合了 MFG 單位所設置的「自動拒簽規則」
+- 解決步驟：您可以從 Siview -> 特殊晶片功能 -> eRuncard 功能選單 -> eSplit Runcard -> 資料維護 -> 製造部自動簽核條件 (尋找條件為 RuleFunction=Reject 且 Rule Status=Active 的 Rule) 來找到拒簽規則，並依此來調整您的 RunCard Condition 以避免拒簽,查找 Rule Function 為 Reject 且 Rule Status 為 Active 的項目，並根據這些規則進行調整。
+
+***
+
+**Chunk 3**（照片 17–18）
+- 問題描述： 解 WFRC Hold 出現「不能解除 Runcard 母批的暫置 (等到 Runcard complete 時會自動解除)」錯誤
+  ![解 WFRC Hold 出現「不能解除 Runcard 母批的暫置 (等到 Runcard complete 時會自動解除)」錯誤](image:/api/v1/fetchImage/MLFWhRZgNP/TURVjw7Ugr/2)
+- 可能原因：未做 Runcard 完成
+- 解決步驟：請參照「[Release WFRC Hold 操作步驟](https://tkms.digwork.tw.ent.tsmc.com/pages/G2PycHeKvr#cQByzmru5Z267xMwU1cxG)」小節操作，透過 Runcard 完成來結束 Runcard，WFRC Hold 便會自動解除
+- 參考資料 :
+- [https://it-case-center.itsd.tsmc.com/case/Case-20251202-02573](https://it-case-center.itsd.tsmc.com/case/Case-20251202-02573 "https://it-case-center.itsd.tsmc.com/case/Case-20251202-02573")
+
+***
+
+**Chunk 4**（照片 18–19）
+![CSRCC504: 0011320E: More than one [WFRC] Hold records. 有超過一個以上的 Hold 存在, 請工程師先處理其他多餘的 Hold, 只留下正確且唯一的 WFRC Hold, 並在做一次 RC Complete.](image:/api/v1/fetchImage/G2vENQd9Ka/TURVCmPLvn/2)
+- Step1. 使用前請先確認
+- 所有子母批都已回到 Main Route 原本開 Runcard 的站點 (可參考「[Runcard 取消操作步驟](https://tkms.digwork.tw.ent.tsmc.com/pages/GY3gX1P3Z4#iLsz-vsEpsxulnl0cID_g)」小節，將 Lot 先帶回 Main Route )
+- 母批身上要有 WFRC Hold
+- Lot 身上只能留這些 Hold：RRAM, YRCP, WFRC, CCWM, MGHL, FHLD
+- 以上 6 個 Hold，系統會自動解，不用手動解。尤其 FHLD 可以擋住 ABO auto merge，請勿解掉 (FHLD 跟 Future Hold 是不同意思，FHLD 是真的有一個 Hold 叫 FHLD)
+- 以上 6 個以外的 Hold 請先手動解掉
+- 如果要跳站
+- 不可有 ENHL Future Hold 在跳站站點 (生門做完後，系統會自動在跳站站點再 hold 上 ENH)
+- 在 Runcard 站點到跳站站點之間不可有 Future Hold 存在
+- Foup 不能已 Load 到機台 (有的話請先收貨)
+
+**Chunk 5**（照片 19–）
+- Step0. 您必須知道的事 (請閱讀完以下注意事項後，在開始 Release WFRC Hold 操作步驟)
+- 可以手動解 WFRC Hold 的情境：原則上當 Lot 已進去過 Runcard Route 就不允許手動解 WFRC，但以下情況可請 PE/PID/RD 手動解除 WFRC Hold
+- Runcard 已退件
+- 繼承到母批的 WFRC，…
+- （照片 19 到此截斷，接續下一張）
