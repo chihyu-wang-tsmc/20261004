@@ -1,0 +1,8 @@
+# Python 3.10 以上
+openai>=1.60        # 作答的 LLM 和 Gemini classifier（OpenAI 相容 API）
+httpx>=0.27         # H2O-Lightning-4B 的 shim
+numpy>=1.24
+matplotlib>=3.7
+openpyxl>=3.1       # Excel
+pyarrow>=14         # 讀 parquet 格式的資料集
+python-dotenv>=1.0  # 讀 .env
