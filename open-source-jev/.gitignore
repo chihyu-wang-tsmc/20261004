@@ -1,0 +1,8 @@
+# token 不要進 repo
+.env
+
+__pycache__/
+.ruff_cache/
+
+# run 的結果和報表：每個人自己跑出來的，而且裡面有有害 prompt 和 LLM 的回覆
+results/
