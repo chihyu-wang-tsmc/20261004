@@ -49,12 +49,13 @@ bash h2o-lightning-4b/serve.sh     # 暖機完會印 ready
 python classifier_h2o.py           # 問一題，確認服務通了
 ```
 
-**LLM**（gemini-3.7-flash、gemma-4-31b、qwen3.5-0.8b）：都走 OpenAI 相容的 API（`/v1/chat/completions`），
+**LLM**：gemini-3.5-flash、gemma-4-31b、qwen3.5-0.8b 負責作答，gemini-3.7-flash 當 coding 的 classifier。
+都走 OpenAI 相容的 API（`/v1/chat/completions`），
 公司 AI gateway、本機 vLLM 都可以。每個 model 在 `.env` 填 `<字首>_BASE_URL`、`<字首>_TOKEN`，
 字首和單價在 `models.py`。
 
 ```bash
-python classifier_gemini.py        # 用 Gemini 問一題，確認 gateway 通了
+python classifier_gemini.py        # 用 gemini-3.7-flash 問一題，確認 gateway 通了
 ```
 
 ## 1. coding 偵測
@@ -85,12 +86,12 @@ python coding_report.py status --classifier h2o-lightning-4b      # 哪些資料
 - **作答**：fast 和 powerful 都把四個 benchmark 答一遍。
 
 ```bash
-python run_bench.py all answer --model gemini-3.7-flash    # powerful
+python run_bench.py all answer --model gemini-3.5-flash    # powerful
 python run_bench.py all answer --model gemma-4-31b         # fast
 python run_bench.py all summary                            # 各 model 的正確率、token、花費
 
 python routing_report.py status                            # 缺什麼、要跑什麼
-python routing_report.py report                            # fast = gemma-4-31b、powerful = gemini-3.7-flash
+python routing_report.py report                            # fast = gemma-4-31b、powerful = gemini-3.5-flash
 
 # 比好幾個 fast（route_p 和 fast 是誰無關，換 fast 只要讓它作答）
 python run_bench.py all answer --model qwen3.5-0.8b
@@ -117,7 +118,7 @@ python guard_report.py report --policy permissive # 照 permissive（block ≥ 0
 
 - **run 的時候第一道不擋任何題目**，每題都送進 LLM、每個回覆都問第二道；擋不擋是 report 才照 `--policy` 的門檻算的，
   所以換門檻不用重跑。代價是**有害的 prompt 真的會送進 LLM**，而且每一題都是一次 LLM 呼叫。先用 `-n 20` 小規模試。
-- LLM 預設 fast = gemma-4-31b、powerful = gemini-3.7-flash，可用 `--fast` / `--powerful` 換。
+- LLM 預設 fast = gemma-4-31b、powerful = gemini-3.5-flash（和 routing 同一組），可用 `--fast` / `--powerful` 換。
 - 「回覆是否有害」預設用啟發式（有害的 prompt、回覆不是拒答就算有害）。要人工標：
   `python guard_report.py label` 匯出 CSV，在 `reply_harmful` 欄填 1 / 0，再跑 report。
 
