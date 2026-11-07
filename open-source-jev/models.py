@@ -1,8 +1,8 @@
 """作答用的 LLM：一律走 OpenAI 相容的 chat completions API（公司 AI gateway、本機 vLLM 都是）。
 
-    run_bench.py         讓 model 回答 GPQA / AIME / AI2 ARC / GSM8K
+    run_bench.py         讓 model 回答 GPQA / AIME / AI2 ARC / GSM8K（gemini-3.5-flash 是 powerful）
     guard_report.py run  第 2 步：守門放行的題目交給 model_route 選到的 model 回答
-    classifier_gemini.py Gemini 當 classifier 時也走這裡的連線設定
+    classifier_gemini.py gemini-3.7-flash 當 classifier 時也走這裡的連線設定
 
 每個 model 的連線設定放在 .env（範例見 .env.example），變數名稱是 MODELS 的 env 字首加上：
     <env>_BASE_URL   API 網址，例如 https://<gateway>/v1、http://localhost:8001/v1
@@ -33,6 +33,8 @@ class ModelSpec:
 
 
 MODELS = {
+    # 第三方價目表（pricepertoken.com、modelcompare.dev）列的 Google AI Studio 價格；公司 gateway 的價格不同就改這裡
+    "gemini-3.5-flash": ModelSpec("GEMINI_35_FLASH", "gemini-3.5-flash", 1.50, 9.00),
     "gemini-3.7-flash": ModelSpec("GEMINI_37_FLASH", "gemini-3.7-flash", 0.30, 2.50),
     "gemma-4-31b": ModelSpec("GEMMA_4_31B", "gemma-4-31b", 0.14, 0.42),
     "qwen3.5-0.8b": ModelSpec("QWEN35_08B", "qwen3.5-0.8b", 0.05, 0.08),

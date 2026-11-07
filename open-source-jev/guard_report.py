@@ -7,7 +7,8 @@
 
 類別：safety、jailbreak、injection、cyber、coding、fast-powerful（資料集見 prompt_datasets.py）。
 兩道守門問 --classifier（預設 h2o-lightning-4b）；LLM 是 model_route 選的那個：
-fast = gemma-4-31b、powerful = gemini-3.7-flash（--fast / --powerful 可以換，連線設定見 models.py）。
+fast = gemma-4-31b、powerful = gemini-3.5-flash，和 routing 的作答 model 同一組
+（--fast / --powerful 可以換，連線設定見 models.py）。
 
 ---- run：每一題走三步 ----
 
@@ -79,7 +80,7 @@ from models import MODELS, create_model
 from prompt_datasets import CATEGORIES, DATASETS, select
 
 DEFAULT_FAST = "gemma-4-31b"
-DEFAULT_POWERFUL = "gemini-3.7-flash"
+DEFAULT_POWERFUL = "gemini-3.5-flash"
 
 # ============================================================================
 # 守門政策

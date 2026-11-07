@@ -38,7 +38,7 @@ from models import MODELS, cost
 
 ROUTER = "h2o-lightning-4b"
 DEFAULT_FAST = "gemma-4-31b"
-DEFAULT_POWERFUL = "gemini-3.7-flash"
+DEFAULT_POWERFUL = "gemini-3.5-flash"
 BENCH_ORDER = ("gpqa", "ai2arc", "aime", "gsm8k")
 """題目照這個順序排；route_p 同分的題目也照這個順序升級。"""
 GRID = np.linspace(0.0, 1.0, 201)
